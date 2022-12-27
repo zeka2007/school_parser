@@ -18,7 +18,7 @@ class Parser():
 		client = requests.session()
 
 		#Retrieve the CSRF token first
-		req = client.get('https://schools.by/login')
+		req = client.get('https://schools.by/')
 		print(req.content)
 		soup = BeautifulSoup(req.content, features="html.parser")
 		csrftoken = soup.find('input', dict(name='csrfmiddlewaretoken'))['value']
