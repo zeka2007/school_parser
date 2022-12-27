@@ -1,0 +1,6 @@
+token =
+
+BOT_SQL_HOST = 
+BOT_SQL_USER = 
+BOT_SQL_PASS = 
+BOT_SQL_DB_NAME = 
