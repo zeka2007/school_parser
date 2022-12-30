@@ -1,8 +1,6 @@
-import os
+token = '1638834366:AAF4ihs5j88iWkYCxRyeK7IwQkWrPFQ7Ddg'
 
-token = os.getenv('token')
-
-BOT_SQL_HOST = os.getenv('host')
-BOT_SQL_USER = os.getenv('user')
-BOT_SQL_PASS = os.getenv('password')
+BOT_SQL_HOST = '161.97.78.70'
+BOT_SQL_USER = 'u11622_GFj91R0wJe'
+BOT_SQL_PASS = '=iTP6aIl9OX3Y7YL0@@whpTC'
 BOT_SQL_DB_NAME = 's11622_daikath'
