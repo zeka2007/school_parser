@@ -5,7 +5,6 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ContentType, Inli
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from prettytable import PrettyTable
 import bot_sql
 import buttons
 import parser
@@ -28,11 +27,11 @@ class LoginState(StatesGroup):
 
 
 @dp.callback_query_handler(text_contains='quarter')
-async def process_callback_button(callback_query: types.CallbackQuery):
+async def process_callback_button_(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
     quarter = int(callback_query.data[-1])
     await bot.send_message(callback_query.from_user.id,
-                           'Получение информачии...')
+                           'Получение информации...')
     marks = parser.get_quarters_marks(callback_query.from_user.id,
                                       quarter)
     old_marks = None
@@ -44,6 +43,18 @@ async def process_callback_button(callback_query: types.CallbackQuery):
 
     await bot.send_message(callback_query.from_user.id,
                            text)
+
+
+@dp.callback_query_handler(text_contains='lesson')
+async def process_callback_button_lessons(callback_query: types.CallbackQuery):
+    await bot.answer_callback_query(callback_query.id)
+    user_id = callback_query.from_user.id
+    await bot.send_message(user_id, 'Сбор информации...')
+    num = parser.get_current_quarter(user_id)
+    lesson = parser.get_lessons(user_id)[int(callback_query.data.split('_')[1])]
+    marks = parser.get_all_marks(user_id, num, lesson)
+    text = tables.lessons_marks_table(marks)
+    await bot.send_message(user_id, text)
 
 
 @dp.message_handler(commands=['start'])
@@ -72,7 +83,7 @@ async def send_welcome(message: types.Message):
 
 
 @dp.message_handler(commands=['exit'])
-async def exit(message: types.Message):
+async def exit_from_system(message: types.Message):
     user_id = types.User.get_current().id
 
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
@@ -93,16 +104,23 @@ async def buttons_handler(message: types.Message):
         await message.answer('Введите свой логин', reply_markup=keyboard)
         await LoginState.S1.set()
 
+    a_menu = buttons.analytics_menu_buttons
+
     if message.text == buttons.main_menu_buttons[0]:
         await message.answer('Выберите категорию:',
                              reply_markup=buttons.analytics_menu())
 
-    if message.text == buttons.analytics_menu_buttons[0]:
-        user_id = types.User.get_current().id
-        quarter_id = parser.get_quarter_id(user_id, 2)
+    if message.text == a_menu[0]:
         await message.answer('Выберите четверть',
                              reply_markup=buttons.quarter_inline_buttons())
-    if message.text == buttons.analytics_menu_buttons[1]:
+
+    if message.text == a_menu[1]:
+        user_id = types.User.get_current().id
+        # parser.get_all_marks(user_id, 3)
+        await message.answer('Выберите предмет',
+                             reply_markup=buttons.lessons_inline_buttons(user_id))
+
+    if message.text == a_menu[len(a_menu) - 1]:
         await message.answer('Выберите категорию',
                              reply_markup=buttons.main_menu())
 
