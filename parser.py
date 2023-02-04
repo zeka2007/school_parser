@@ -325,7 +325,12 @@ class Parser:
                             mark = mark.replace('\n', '')
                             # print(f'[{mark}]')
                             if mark != '':
-                                marks.append(int(mark))
+                                if mark.find('/') != -1:
+                                    marks.append(int(mark.split('/')[0]))
+                                    # print(mark.split('/')[0])
+                                    marks.append(int(mark.split('/')[1]))
+                                else:
+                                    marks.append(int(mark))
 
             date = date + timedelta(weeks=1)
 

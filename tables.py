@@ -10,10 +10,10 @@ def quarter_marks_analytics(lessons: list,
             percent = ''
             if marks[i] != 'з.' and old_marks[i] != 'з.' and marks[i] != 'Нет' and old_marks[i] != 'Нет':
                 if old_marks[i] > marks[i]:
-                    number = (int(old_marks[i]) - int(marks[i]))/int(old_marks[i]) * 100
+                    number = (int(old_marks[i]) - int(marks[i])) / int(old_marks[i]) * 100
                     percent = f'(- {round(number, 1)} %)'
                 else:
-                    number = (int(marks[i]) - int(old_marks[i]))/int(marks[i]) * 100
+                    number = (int(marks[i]) - int(old_marks[i])) / int(marks[i]) * 100
                     percent = f'(+ {round(number, 1)} %)'
 
             row = f'{lessons[i]} / {old_marks[i]} / {marks[i]} {percent}\n'
@@ -44,7 +44,7 @@ def quarter_marks_analytics(lessons: list,
     if average_mark_old != 0 and average_mark != 0:
         if average_mark > average_mark_old:
             result = f'{result}\n\nСредний балл в этой четверти: {round(average_mark, 2)}, ' \
-                     f'что на {round(((average_mark - average_mark_old)/average_mark * 100), 1)}% лучше, ' \
+                     f'что на {round(((average_mark - average_mark_old) / average_mark * 100), 1)}% лучше, ' \
                      f'чем в прошлой. ' \
                      f'Средний балл в прошлой четверти: {round(average_mark_old, 2)}'
         if average_mark_old > average_mark:
@@ -62,7 +62,7 @@ def quarter_marks_analytics(lessons: list,
     return result
 
 
-def lessons_marks_table(marks: list):
+def lessons_marks_table(marks: list, lesson: str):
     all_marks = ''
     for mark in marks:
         all_marks = all_marks + str(mark) + ' '
@@ -74,9 +74,10 @@ def lessons_marks_table(marks: list):
     for mark in marks:
         middle_mark = middle_mark + mark
 
-    middle_mark = middle_mark/len(marks)
+    middle_mark = middle_mark / len(marks)
 
-    text = f'Отметки: {all_marks}\n' \
+    text = f'Предмет: {lesson}\n' \
+           f'Отметки: {all_marks}\n' \
            f'Средний балл: {round(middle_mark, 2)}\n'
 
     test_mark = 1
@@ -97,5 +98,74 @@ def lessons_marks_table(marks: list):
             text = text + f'Подсказка: получив {test_mark} вы можете получить {round(new_middle_mark)} за четверть'
         else:
             text = text + f'Подсказка: получив {test_mark} или выше вы можете получить {round(new_middle_mark)} за четверть'
+
+    return text
+
+
+def lessons_marks_fix_table(marks: list, lesson: str):
+    all_marks = ''
+    for mark in marks:
+        all_marks = all_marks + str(mark) + ' '
+    if all_marks == '':
+        text = f'Отметок нет'
+        return text
+
+    middle_mark = 0
+    for mark in marks:
+        middle_mark = middle_mark + mark
+
+    middle_mark = middle_mark / len(marks)
+
+    text = f'Предмет: {lesson}\n' \
+           f'Отметки: {all_marks}\n' \
+           f'Средний балл: {round(middle_mark, 2)}\n\n'
+
+    new_middle_mark = 0
+    mark_counter = {}
+    for key in range(1, 11):
+        mark_counter[key] = 0
+
+    counter = 0
+
+    for test_mark in range(1, 11):
+        for i in range(1, 8):
+            for mark in marks:
+                new_middle_mark = new_middle_mark + mark
+            new_middle_mark = new_middle_mark + i * test_mark
+            new_middle_mark = new_middle_mark / (len(marks) + i)
+            mark_counter[test_mark] = mark_counter[test_mark] + 1
+            if round(new_middle_mark) > round(middle_mark):
+                counter = counter + 1
+            new_middle_mark = 0
+        if counter == 0:
+            pass
+            mark_counter[test_mark] = 0
+        else:
+            pass
+            mark_counter[test_mark] = mark_counter[test_mark] - counter
+        counter = 0
+
+    for item in mark_counter:
+        if item != 10:
+            if mark_counter[item] != 0 and mark_counter[item + 1] == 0:
+                mark_counter[item + 1] = 1
+
+    can_change_count = 0
+    for mark in mark_counter:
+        if mark_counter[mark] != 0:
+            can_change_count = can_change_count + 1
+
+    if can_change_count == 0:
+        text = text + 'Вы не можете повысить свою отметку'
+        return text
+
+    text = text + f'Для получения отметки {round(middle_mark) + 1}:\n'
+
+    for mark in mark_counter:
+        if mark_counter[mark] != 0:
+            text = text + f'Вы должны получить {mark} в количестве {mark_counter[mark]}\n'
+            if mark != 10:
+                if mark_counter[mark + 1] != 0:
+                    text = text + 'ИЛИ\n'
 
     return text

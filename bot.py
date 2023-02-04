@@ -53,7 +53,19 @@ async def process_callback_button_lessons(callback_query: types.CallbackQuery):
     num = parser.get_current_quarter(user_id)
     lesson = parser.get_lessons(user_id)[int(callback_query.data.split('_')[1])]
     marks = parser.get_all_marks(user_id, num, lesson)
-    text = tables.lessons_marks_table(marks)
+    text = tables.lessons_marks_table(marks, lesson)
+    await bot.send_message(user_id, text)
+
+
+@dp.callback_query_handler(text_contains='fix')
+async def process_callback_button_lessons(callback_query: types.CallbackQuery):
+    await bot.answer_callback_query(callback_query.id)
+    user_id = callback_query.from_user.id
+    await bot.send_message(user_id, 'Сбор информации...')
+    num = parser.get_current_quarter(user_id)
+    lesson = parser.get_lessons(user_id)[int(callback_query.data.split('_')[1])]
+    marks = parser.get_all_marks(user_id, num, lesson)
+    text = tables.lessons_marks_fix_table(marks, lesson)
     await bot.send_message(user_id, text)
 
 
@@ -110,6 +122,10 @@ async def buttons_handler(message: types.Message):
         await message.answer('Выберите категорию:',
                              reply_markup=buttons.analytics_menu())
 
+    if message.text == buttons.main_menu_buttons[1]:
+        await message.answer('Выберите категорию:',
+                             reply_markup=buttons.fix_menu())
+
     if message.text == a_menu[0]:
         await message.answer('Выберите четверть',
                              reply_markup=buttons.quarter_inline_buttons())
@@ -119,6 +135,12 @@ async def buttons_handler(message: types.Message):
         # parser.get_all_marks(user_id, 3)
         await message.answer('Выберите предмет',
                              reply_markup=buttons.lessons_inline_buttons(user_id))
+
+    if message.text == buttons.fix_menu_buttons[0]:
+        user_id = types.User.get_current().id
+
+        await message.answer('Выберите предмет',
+                             reply_markup=buttons.lessons_inline_buttons(user_id, tag='fix'))
 
     if message.text == a_menu[len(a_menu) - 1]:
         await message.answer('Выберите категорию',
