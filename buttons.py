@@ -6,11 +6,17 @@ not_login = '🔑 Войти'
 cancel = '❌ Отмена'
 
 main_menu_buttons = [
-    '🔎 Анализ отметок'
+    '🔎 Анализ отметок',
+    '🧐 Советы по исправлению',
 ]
 analytics_menu_buttons = [
     '📅 Анализ четвертных отметок',
     '🧮 Средний балл',
+    '⬅️ Назад'
+]
+
+fix_menu_buttons = [
+    '⁉️ Способы исправления отметки',
     '⬅️ Назад'
 ]
 
@@ -26,6 +32,14 @@ def main_menu():
 def analytics_menu():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
     for menu_item in analytics_menu_buttons:
+        b = KeyboardButton(menu_item)
+        keyboard.add(b)
+    return keyboard
+
+
+def fix_menu():
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    for menu_item in fix_menu_buttons:
         b = KeyboardButton(menu_item)
         keyboard.add(b)
     return keyboard
@@ -47,14 +61,14 @@ def quarter_inline_buttons():
     return inline_kb
 
 
-def lessons_inline_buttons(user_id: int):
+def lessons_inline_buttons(user_id: int, tag: str = 'lesson'):
     inline_kb = InlineKeyboardMarkup(row_width=2)
     par = parser.Parser()
     lessons = par.get_lessons(user_id=user_id)
     counter = 0
     for lesson in lessons:
         inline_btn = InlineKeyboardButton(lesson,
-                                          callback_data=f'lesson_{counter}')
+                                          callback_data=f'{tag}_{counter}')
         inline_kb.insert(inline_btn)
         counter = counter + 1
 
