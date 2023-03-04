@@ -1,14 +1,11 @@
 import logging
 import config
 from aiogram import Bot, Dispatcher, executor, types
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ContentType, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ContentType
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-import bot_sql
-import buttons
-import parser
-import tables
+from bothelp import bot_sql, parser, tables, buttons
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,10 +17,16 @@ dp = Dispatcher(bot, storage=MemoryStorage())
 mysql = bot_sql.MySQL()
 parser = parser.Parser()
 
+users_if_get_marks = {}
+
 
 class LoginState(StatesGroup):
     S1 = State()
     S2 = State()
+
+
+class IfGetMarks(StatesGroup):
+    state = State()
 
 
 @dp.callback_query_handler(text_contains='quarter')
@@ -67,6 +70,20 @@ async def process_callback_button_lessons(callback_query: types.CallbackQuery):
     marks = parser.get_all_marks(user_id, num, lesson)
     text = tables.lessons_marks_fix_table(marks, lesson)
     await bot.send_message(user_id, text)
+
+
+@dp.callback_query_handler(text_contains='if')
+async def process_callback_button_if(callback_query: types.CallbackQuery):
+    await bot.answer_callback_query(callback_query.id)
+    user_id = callback_query.from_user.id
+    await bot.send_message(user_id, 'Сбор информации...')
+    num = parser.get_current_quarter(user_id)
+    lesson = parser.get_lessons(user_id)[int(callback_query.data.split('_')[1])]
+    marks = parser.get_all_marks(user_id, num, lesson)
+    text = tables.lessons_if_get_mark_table(marks, lesson)
+    users_if_get_marks[user_id] = marks
+    await IfGetMarks.state.set()
+    await bot.send_message(user_id, text, reply_markup=buttons.cancel_menu())
 
 
 @dp.message_handler(commands=['start'])
@@ -141,6 +158,12 @@ async def buttons_handler(message: types.Message):
 
         await message.answer('Выберите предмет',
                              reply_markup=buttons.lessons_inline_buttons(user_id, tag='fix'))
+
+    if message.text == buttons.fix_menu_buttons[1]:
+        user_id = types.User.get_current().id
+
+        await message.answer('Выберите предмет',
+                             reply_markup=buttons.lessons_inline_buttons(user_id, tag='if'))
 
     if message.text == a_menu[len(a_menu) - 1]:
         await message.answer('Выберите категорию',
@@ -227,6 +250,30 @@ async def login_2(message: types.Message, state: FSMContext):
         await message.answer('Ошибка авторизации. Повторите попытку.')
         await message.answer('Введите свой логин')
         await LoginState.S1.set()
+
+
+@dp.message_handler(state=IfGetMarks.state)
+async def if_get_mark_state(message: types.Message, state: FSMContext):
+    if message.text == buttons.cancel:
+        await message.answer('Заверешено', reply_markup=buttons.main_menu())
+        await state.finish()
+        return
+    user_id = message.from_id
+    user_marks = []
+    user_marks.extend(users_if_get_marks[user_id])
+    for mark in message.text.split(' '):
+        if mark.isdigit():
+            if 10 >= int(mark) > 0:
+                user_marks.append(int(mark))
+            else:
+                return await message.answer('Введите число не больше 10')
+
+        else:
+            return await message.answer('Введите число, а не строку')
+
+    text = tables.lessons_marks_table(user_marks)
+    await message.answer(text)
+    await IfGetMarks.state.set()
 
 
 if __name__ == '__main__':
