@@ -1,11 +1,12 @@
 import logging
 import config
+import time
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ContentType
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from bothelp import bot_sql, parser, tables, buttons
+from bothelp import bot_sql, parser, tables, buttons, multiprocesshelp
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -16,6 +17,7 @@ dp = Dispatcher(bot, storage=MemoryStorage())
 
 mysql = bot_sql.MySQL()
 parser = parser.Parser()
+multiprocess = multiprocesshelp.Multiprocess()
 
 users_if_get_marks = {}
 
@@ -50,14 +52,16 @@ async def process_callback_button_(callback_query: types.CallbackQuery):
 
 @dp.callback_query_handler(text_contains='lesson')
 async def process_callback_button_lessons(callback_query: types.CallbackQuery):
+    # timer = time.time()
     await bot.answer_callback_query(callback_query.id)
     user_id = callback_query.from_user.id
     await bot.send_message(user_id, 'Сбор информации...')
     num = parser.get_current_quarter(user_id)
     lesson = parser.get_lessons(user_id)[int(callback_query.data.split('_')[1])]
-    marks = parser.get_all_marks(user_id, num, lesson)
+    marks = multiprocess.get_all_marks(user_id, num, lesson)
     text = tables.lessons_marks_table(marks, lesson)
     await bot.send_message(user_id, text)
+    # await bot.send_message(user_id, str(time.time() - timer))
 
 
 @dp.callback_query_handler(text_contains='fix')
@@ -67,7 +71,7 @@ async def process_callback_button_lessons(callback_query: types.CallbackQuery):
     await bot.send_message(user_id, 'Сбор информации...')
     num = parser.get_current_quarter(user_id)
     lesson = parser.get_lessons(user_id)[int(callback_query.data.split('_')[1])]
-    marks = parser.get_all_marks(user_id, num, lesson)
+    marks = multiprocess.get_all_marks(user_id, num, lesson)
     text = tables.lessons_marks_fix_table(marks, lesson)
     await bot.send_message(user_id, text)
 
@@ -79,7 +83,7 @@ async def process_callback_button_if(callback_query: types.CallbackQuery):
     await bot.send_message(user_id, 'Сбор информации...')
     num = parser.get_current_quarter(user_id)
     lesson = parser.get_lessons(user_id)[int(callback_query.data.split('_')[1])]
-    marks = parser.get_all_marks(user_id, num, lesson)
+    marks = multiprocess.get_all_marks(user_id, num, lesson)
     text = tables.lessons_if_get_mark_table(marks, lesson)
     users_if_get_marks[user_id] = marks
     await IfGetMarks.state.set()
@@ -105,8 +109,9 @@ async def send_welcome(message: types.Message):
             keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
             b1 = KeyboardButton(buttons.not_login)
             keyboard.add(b1)
+    me = await bot.get_me()
     await message.answer(
-        f"Привет, {user_name}! Меня зовут Daikath "
+        f"Привет, {user_name}! Меня зовут {me.first_name} "
         "и я помогу тебе с работой в электронном дневнике.",
         reply_markup=keyboard)
 

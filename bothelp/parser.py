@@ -335,3 +335,168 @@ class Parser:
             date = date + timedelta(weeks=1)
 
         return marks
+
+    def get_all_marks_from_page(self, user_id: int, quarter: int, page: int, lesson_name: str = None):
+        if not self.is_login(user_id):
+            data = sql.get_login_data(user_id)
+            if self.login(user_id, data['login'], data['password']) is False:
+                return False
+
+        data = sql.get_login_data(user_id)
+        cookies = {
+            'csrftoken': data['csrf_token'],
+            'sessionid': data['session_id'],
+            'slc_cookie': '{slcMakeBetter}{headerPopupsIsClosed}'
+        }
+
+        student_id = sql.get_id(user_id)
+
+        interval = {}
+
+        req = requests.get(f'https://209minsk.schools.by/pupil/{student_id}/dnevnik/last-page',
+                           headers={'user-agent': self.agent},
+                           cookies=cookies).content
+
+        soup = BeautifulSoup(req, features="html.parser")
+        tds = soup.find_all('td', {'class': 'qdates'})
+        i = 1
+        for td in tds:
+            result = td.text.replace('-', ' ')
+            result = result.replace('\n', '')
+            result = result.split(' ')
+            date_start = int(result[0])
+            month_start = df.formats[result[1]]
+            date_end = int(result[2])
+            month_end = df.formats[result[3]]
+            interval[i] = {
+                'start_date': date_start,
+                'start_month': month_start,
+                'end_date': date_end,
+                'end_month': month_end,
+            }
+            i = i + 1
+
+        # get date
+        current_year = datetime.datetime.now().year
+        if quarter <= 2:
+            start_date = datetime.datetime(current_year - 1,
+                                           interval[quarter]['start_month'],
+                                           interval[quarter]['start_date'])
+            end_date = datetime.datetime(current_year - 1,
+                                         interval[quarter]['end_month'],
+                                         interval[quarter]['end_date'])
+        else:
+            start_date = datetime.datetime(current_year,
+                                           interval[quarter]['start_month'],
+                                           interval[quarter]['start_date'])
+            end_date = datetime.datetime(current_year,
+                                         interval[quarter]['end_month'],
+                                         interval[quarter]['end_date'])
+
+        # get marks in this quarter
+        full_quarter = self.get_quarter_id(user_id, quarter)
+
+        date = start_date
+
+        marks = []
+
+        i = 1
+
+        while True:
+            if date > end_date:
+                break
+
+            if i == page:
+                # print(date)
+                date_url = date.strftime("%Y-%m-%d")
+                req = requests.get(f'https://209minsk.schools.by/pupil/'
+                                   f'{student_id}/dnevnik/quarter/{full_quarter}/week/{date_url}',
+                                   headers={'user-agent': self.agent},
+                                   cookies=cookies).content
+
+                soup = BeautifulSoup(req, features="html.parser")
+                days = soup.find_all('div', {'class': 'db_day'})
+                for day in days:
+                    lessons = day.find('tbody').find_all('tr')
+                    for lesson in lessons:
+                        ln = lesson.find('td', {'class': 'lesson'})
+                        ln = ln.text
+                        ln = ln.replace('\n', '')[2:]
+                        if ln != '':
+                            if ln == lesson_name:
+                                mark = lesson.find('div', {'class': 'mark_box'}).text
+                                mark = mark.replace('\n', '')
+                                # print(f'[{mark}]')
+                                if mark != '':
+                                    if mark.find('/') != -1:
+                                        marks.append(int(mark.split('/')[0]))
+                                        # print(mark.split('/')[0])
+                                        marks.append(int(mark.split('/')[1]))
+                                    else:
+                                        marks.append(int(mark))
+
+            date = date + timedelta(weeks=1)
+            i = i + 1
+
+        return marks
+
+    def get_pages_count(self, user_id: int, quarter: int):
+        if not self.is_login(user_id):
+            data = sql.get_login_data(user_id)
+            if self.login(user_id, data['login'], data['password']) is False:
+                return False
+
+        data = sql.get_login_data(user_id)
+        cookies = {
+            'csrftoken': data['csrf_token'],
+            'sessionid': data['session_id'],
+            'slc_cookie': '{slcMakeBetter}{headerPopupsIsClosed}'
+        }
+
+        student_id = sql.get_id(user_id)
+
+        interval = {}
+
+        req = requests.get(f'https://209minsk.schools.by/pupil/{student_id}/dnevnik/last-page',
+                           headers={'user-agent': self.agent},
+                           cookies=cookies).content
+
+        soup = BeautifulSoup(req, features="html.parser")
+        tds = soup.find_all('td', {'class': 'qdates'})
+        i = 1
+        for td in tds:
+            result = td.text.replace('-', ' ')
+            result = result.replace('\n', '')
+            result = result.split(' ')
+            date_start = int(result[0])
+            month_start = df.formats[result[1]]
+            date_end = int(result[2])
+            month_end = df.formats[result[3]]
+            interval[i] = {
+                'start_date': date_start,
+                'start_month': month_start,
+                'end_date': date_end,
+                'end_month': month_end,
+            }
+            i = i + 1
+
+        # get date
+        current_year = datetime.datetime.now().year
+        if quarter <= 2:
+            start_date = datetime.datetime(current_year - 1,
+                                           interval[quarter]['start_month'],
+                                           interval[quarter]['start_date'])
+            end_date = datetime.datetime(current_year - 1,
+                                         interval[quarter]['end_month'],
+                                         interval[quarter]['end_date'])
+        else:
+            start_date = datetime.datetime(current_year,
+                                           interval[quarter]['start_month'],
+                                           interval[quarter]['start_date'])
+            end_date = datetime.datetime(current_year,
+                                         interval[quarter]['end_month'],
+                                         interval[quarter]['end_date'])
+
+        date = end_date - start_date
+
+        return int(((date.days - (date.days % 7)) / 7) + 1)
