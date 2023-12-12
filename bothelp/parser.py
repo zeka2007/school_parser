@@ -145,11 +145,15 @@ class WebUser:
                 if span == f'{quarter} четверть':
                     return a['quarter_id']
 
-    @check_login
     def get_current_quarter(self, update: bool = False):
         data = self.sql.get_current_quarter()
         if data and not update:
             return data
+
+        if not self.is_login():
+            data = self.sql.get_login_data()
+            if login_user(self.user_id, data['login'], data['password']) is False:
+                return False
 
         req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik',
                            headers={'user-agent': agent},
@@ -161,11 +165,15 @@ class WebUser:
         self.sql.set_current_quarter(num)
         return num
 
-    @check_login
     def get_current_quarter_full(self, update: bool = False):
         data = self.sql.get_full_quarter()
         if data and not update:
             return data
+
+        if not self.is_login():
+            data = self.sql.get_login_data()
+            if login_user(self.user_id, data['login'], data['password']) is False:
+                return False
 
         req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik',
                            headers={'user-agent': agent},
@@ -201,12 +209,16 @@ class WebUser:
 
         return q_marks
 
-    @check_login
     def get_lessons(self, update: bool = False):
         file_manager = fm.UserData(self.student_id)
         data = file_manager.get_lessons()
         if data is not None and not update:
             return data
+
+        if not self.is_login():
+            data = self.sql.get_login_data()
+            if login_user(self.user_id, data['login'], data['password']) is False:
+                return False
 
         lessons = []
 
