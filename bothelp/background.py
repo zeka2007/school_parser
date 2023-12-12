@@ -1,25 +1,26 @@
 import asyncio
+import logging
 import multiprocessing
-from bothelp import bot_sql, parser, marks_manager
+from bothelp import bot_sql, parser
 
-sql = bot_sql.MySQL()
 # par = parser.WebUser(1134428403)
-manager = marks_manager.Manager()
+# manager = marks_manager.Manager()
 
 
 async def update_data():
-    data = sql.get_all_users()
+    data = bot_sql.MySQL.get_all_users()
     for user in data:
         user_obj = parser.WebUser(user[0])
-        result = user_obj.get_lessons(update=True)
-        if result:
+        try:
+            user_obj.get_lessons(update=True)
             user_obj.get_current_quarter(update=True)
             user_obj.get_current_quarter_full(update=True)
-            return
+        except Exception as e:
+            logging.warning(f'{e} for user {user_obj.student_id}')
 
 
-async def update_alarm():
-    await manager.update_alarm()
+# async def update_alarm():
+#     await manager.update_alarm()
 
 
 async def checker():
@@ -34,7 +35,7 @@ async def checker():
 async def checker_alarm():
     try:
         while True:
-            await update_alarm()
+            # await update_alarm()
             await asyncio.sleep(360)
     except (KeyboardInterrupt, SystemExit):
         pass
@@ -55,7 +56,8 @@ def start_alarm():
         pass
 
 
-multiprocessing.Process(target=start).start()
-multiprocessing.Process(target=start_alarm).start()
+def startup_all_process():
+    multiprocessing.Process(target=start).start()
+# multiprocessing.Process(target=start_alarm).start()
 
 # update_data()

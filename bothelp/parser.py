@@ -1,4 +1,4 @@
-import os.path
+import logging
 
 import requests
 from bs4 import BeautifulSoup
@@ -6,31 +6,82 @@ from bothelp import bot_sql
 import datetime
 from datetime import timedelta
 from bothelp import date_format as df
+from bothelp import file_manager as fm
 
-sql = bot_sql.MySQL()
+
+agent = 'Mozilla/5.0 (X11; Linux i686; rv:80.0) Gecko/20100101 Firefox/80.0'
+URL = 'https://schools.by/login'
 
 
 def check_login(func):
     def wrapper(*args, **kwargs):
         self = args[0]
         if not self.is_login():
-            data = sql.get_login_data(self.user_id)
-            if self.login(self.user_id, data['login'], data['password']) is False:
+            data = self.sql.get_login_data()
+            if login_user(self.user_id, data['login'], data['password']) is False:
                 return False
         return func(*args, **kwargs)
 
     return wrapper
 
 
+def login_user(user_id, login: str, password: str):
+    headers = {
+        'user-agent': agent,
+        'Referer': URL
+    }
+
+    client = requests.session()
+
+    # Retrieve the CSRF token first
+    req = client.get('https://schools.by/login')
+    soup = BeautifulSoup(req.content, features="html.parser")
+    csrftoken = soup.find('input', dict(name='csrfmiddlewaretoken'))['value']
+
+    login_data = {
+        'csrfmiddlewaretoken': csrftoken,
+        'username': login,
+        'password': password,
+        '|123': '|123'
+    }
+    r = client.post(
+        URL,
+        data=login_data,
+        headers=headers,
+        allow_redirects=True,
+        verify=False)
+    redirect_url = r.url
+    if redirect_url == URL:
+        return False
+
+    db = bot_sql.MySQL(user_id)
+    db.set_site_prefix(redirect_url.split('.')[0].replace('https://', ''))
+    db.set_id(int(redirect_url.split('/')[-1]))
+
+    for resp in r.history:
+        db.set_login_data(
+            {
+                'login': None,
+                'password': None,
+                'csrf_token': resp.cookies['csrftoken'],
+                'session_id': resp.cookies['sessionid'],
+            }
+        )
+    return True
+
+
 class WebUser:
     def __init__(self, user_id: int):
-        self.agent = 'Mozilla/5.0 (X11; Linux i686; rv:80.0) Gecko/20100101 Firefox/80.0'
-        self.URL = 'https://schools.by/login'
 
-        self.user_data = sql.get_login_data(user_id)
+        self.cookies = {}
+
+        self.sql = bot_sql.MySQL(user_id)
+
+        self.user_data = self.sql.get_login_data()
         self.user_id = user_id
+        self.personal_url = f'https://{self.sql.get_site_prefix()}.schools.by'
 
-        self.student_id = sql.get_id(self.user_id)
+        self.student_id = self.sql.get_id()
 
         if self.user_data is not None:
             if self.user_data['csrf_token'] is not None and self.user_data['session_id'] is not None:
@@ -40,66 +91,13 @@ class WebUser:
                     'slc_cookie': '{slcMakeBetter}{headerPopupsIsClosed}'
                 }
 
-    def login(self, login: str, password: str):
-        headers = {
-            'user-agent': self.agent,
-            'Referer': self.URL
-        }
-
-        client = requests.session()
-
-        # Retrieve the CSRF token first
-        req = client.get('https://schools.by/login')
-        soup = BeautifulSoup(req.content, features="html.parser")
-        csrftoken = soup.find('input', dict(name='csrfmiddlewaretoken'))['value']
-
-        login_data = {
-            'csrfmiddlewaretoken': csrftoken,
-            'username': login,
-            'password': password,
-            '|123': '|123'
-        }
-        r = client.post(
-            self.URL,
-            data=login_data,
-            headers=headers,
-            allow_redirects=True,
-            verify=False)
-        if r.url == self.URL:
-            return False
-
-        for resp in r.history:
-            sql.set_login_data(
-                self.user_id,
-                {
-                    'login': None,
-                    'password': None,
-                    'csrf_token': resp.cookies['csrftoken'],
-                    'session_id': resp.cookies['sessionid'],
-                }
-            )
-        return True
-
     def is_login(self):
-        get = requests.get(self.URL,
-                           headers={'user-agent': self.agent},
+        get = requests.get(URL,
+                           headers={'user-agent': agent},
                            cookies=self.cookies)
-        if get.url == self.URL:
+        if get.url == URL:
             return False
         return True
-
-    @check_login
-    def get_id(self):
-
-        req = requests.get(self.URL,
-                           headers={'user-agent': self.agent},
-                           cookies=self.cookies).content
-        soup = BeautifulSoup(req, features="html.parser")
-        divs = soup.find_all('div', {'class': 'cnt'})
-        for div in divs:
-            student_id = div.find('b')
-            if student_id is not None:
-                return student_id.text
 
     @check_login
     def get_student_info(self):
@@ -109,16 +107,12 @@ class WebUser:
             'class': None,
             'birthday': None
         }
-        req = requests.get(self.URL,
-                           headers={'user-agent': self.agent},
+        req = requests.get(URL,
+                           headers={'user-agent': agent},
                            cookies=self.cookies).content
         soup = BeautifulSoup(req, features="html.parser")
         info['student_name'] = soup.find('h1').text.replace('\n', '')
-        divs = soup.find_all('div', {'class': 'cnt'})
-        for div in divs:
-            student_id = div.find('b')
-            if student_id is not None:
-                info['student_id'] = int(student_id.text)
+        info['student_id'] = self.student_id
 
         divs = soup.find_all('div', {'class': 'pp_line'})
         for div in divs:
@@ -138,8 +132,8 @@ class WebUser:
     @check_login
     def get_quarter_id(self, quarter: int = 0):
 
-        req = requests.get(f'https://209minsk.schools.by/pupil/{self.student_id}/dnevnik',
-                           headers={'user-agent': self.agent},
+        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik',
+                           headers={'user-agent': agent},
                            cookies=self.cookies).content
         soup = BeautifulSoup(req, features="html.parser")
         uls = soup.find_all('ul', {'id': f'db_quarters_menu_{self.student_id}'})
@@ -153,37 +147,35 @@ class WebUser:
 
     @check_login
     def get_current_quarter(self, update: bool = False):
-        if os.path.exists('data/current_quarter.txt') and not update:
-            with open('data/current_quarter.txt', 'r') as file:
-                return int(file.read())
+        data = self.sql.get_current_quarter()
+        if data and not update:
+            return data
 
-        req = requests.get(f'https://209minsk.schools.by/pupil/{self.student_id}/dnevnik',
-                           headers={'user-agent': self.agent},
+        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik',
+                           headers={'user-agent': agent},
                            cookies=self.cookies).content
         soup = BeautifulSoup(req, features="html.parser")
         num = soup.find('a', {'class': 'current'}).text
         num = int(num.split(' ')[0])
-        print('create file 1')
-        with open('data/current_quarter.txt', 'w') as file:
-            file.write(str(num))
+        logging.info(f'update current quarter for {self.student_id}')
+        self.sql.set_current_quarter(num)
         return num
 
     @check_login
     def get_current_quarter_full(self, update: bool = False):
-        if os.path.exists('data/full_current_quarter.txt') and not update:
-            with open('data/full_current_quarter.txt', 'r') as file:
-                return int(file.read())
+        data = self.sql.get_full_quarter()
+        if data and not update:
+            return data
 
-        req = requests.get(f'https://209minsk.schools.by/pupil/{self.student_id}/dnevnik',
-                           headers={'user-agent': self.agent},
+        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik',
+                           headers={'user-agent': agent},
                            cookies=self.cookies).content
         soup = BeautifulSoup(req, features="html.parser")
         num = soup.find('a', {'class': 'current'})['quarter_id']
         num = int(num)
-        print('create file 2')
+        logging.info(f'update full quarter for {self.student_id}')
 
-        with open('data/full_current_quarter.txt', 'w') as file:
-            file.write(str(num))
+        self.sql.set_full_quarter(num)
         return num
 
     @check_login
@@ -191,8 +183,8 @@ class WebUser:
 
         q_marks = []
 
-        req = requests.get(f'https://209minsk.schools.by/pupil/{self.student_id}/dnevnik/last-page',
-                           headers={'user-agent': self.agent},
+        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik/last-page',
+                           headers={'user-agent': agent},
                            cookies=self.cookies).content
 
         soup = BeautifulSoup(req, features="html.parser")
@@ -211,18 +203,20 @@ class WebUser:
 
     @check_login
     def get_lessons(self, update: bool = False):
-        if os.path.exists('data/lessons.txt') and not update:
-            with open('data/lessons.txt', 'r') as file:
-                return file.read().split('\n')[0:-1]
+        file_manager = fm.UserData(self.student_id)
+        data = file_manager.get_lessons()
+        if data is not None and not update:
+            return data
 
         lessons = []
 
-        req = requests.get(f'https://209minsk.schools.by/pupil/{self.student_id}/dnevnik/last-page',
-                           headers={'user-agent': self.agent},
+        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik/last-page',
+                           headers={'user-agent': agent},
                            cookies=self.cookies).content
 
         soup = BeautifulSoup(req, features="html.parser")
         table = soup.find('table', {'class': 'itable ltable'})
+        # print(self.student_id)
         body = table.find('tbody')
         trs = body.find_all('tr')
         for tr in trs:
@@ -252,21 +246,17 @@ class WebUser:
                         i -= 1
                     lesson_name = ''.join(l_list)
                 lessons.append(lesson_name)
-        print('create file 3')
-        with open('data/lessons.txt', 'w') as file:
-            write = ''
-            for lesson in lessons:
-                write = write + lesson + '\n'
-            file.write(write)
+        logging.info(f'create lessons file for {self.student_id}')
+        file_manager.set_lessons(lessons)
+
         return lessons
 
     @check_login
     def get_all_marks(self, quarter: int, lesson_name: str = None):
-
         interval = {}
 
-        req = requests.get(f'https://209minsk.schools.by/pupil/{self.student_id}/dnevnik/last-page',
-                           headers={'user-agent': self.agent},
+        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik/last-page',
+                           headers={'user-agent': agent},
                            cookies=self.cookies).content
 
         soup = BeautifulSoup(req, features="html.parser")
@@ -317,9 +307,9 @@ class WebUser:
                 break
             # print(date)
             date_url = date.strftime("%Y-%m-%d")
-            req = requests.get(f'https://209minsk.schools.by/pupil/'
+            req = requests.get(f'{self.personal_url}/pupil/'
                                f'{self.student_id}/dnevnik/quarter/{full_quarter}/week/{date_url}',
-                               headers={'user-agent': self.agent},
+                               headers={'user-agent': agent},
                                cookies=self.cookies).content
 
             soup = BeautifulSoup(req, features="html.parser")
@@ -385,9 +375,9 @@ class WebUser:
             if i == page:
                 # print(date)
                 date_url = date.strftime("%Y-%m-%d")
-                req = requests.get(f'https://209minsk.schools.by/pupil/'
+                req = requests.get(f'{self.personal_url}/pupil/'
                                    f'{self.student_id}/dnevnik/quarter/{full_quarter}/week/{date_url}',
-                                   headers={'user-agent': self.agent},
+                                   headers={'user-agent': agent},
                                    cookies=self.cookies).content
 
                 soup = BeautifulSoup(req, features="html.parser")
@@ -422,8 +412,8 @@ class WebUser:
 
         interval = {}
 
-        req = requests.get(f'https://209minsk.schools.by/pupil/{self.student_id}/dnevnik/last-page',
-                           headers={'user-agent': self.agent},
+        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik/last-page',
+                           headers={'user-agent': agent},
                            cookies=self.cookies).content
 
         soup = BeautifulSoup(req, features="html.parser")

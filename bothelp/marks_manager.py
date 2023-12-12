@@ -62,10 +62,9 @@ def check_data(json_data_new, json_data_old):
 class Manager:
     def __init__(self):
         self.file_path = 'data/marks.json'
-        self.sql = bot_sql.MySQL()
 
     async def update_alarm(self):
-        data = self.sql.get_all_users()
+        data = bot_sql.MySQL.get_all_users()
         json_data_old = {}
         if os.stat(self.file_path).st_size != 0:
             f = open(self.file_path, 'r')

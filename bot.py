@@ -6,15 +6,16 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from bothelp import bot_sql, parser, tables, buttons, multiprocesshelp
+from bothelp.background import startup_all_process
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
+startup_all_process()
+
 # Initialize bot and dispatcher
 bot = Bot(token=config.token)
 dp = Dispatcher(bot, storage=MemoryStorage())
-
-mysql = bot_sql.MySQL()
 
 users_if_get_marks = {}
 
@@ -30,11 +31,6 @@ class IfGetMarks(StatesGroup):
 
 class SetAlarmLessons(StatesGroup):
     alarm = State()
-
-
-@dp.message_handler(commands=['test'])
-async def test_fun(message: types.Message):
-    await message.answer(parser.WebUser(message.from_user.id).get_id())
 
 
 @dp.callback_query_handler(text_contains='quarter')
@@ -115,14 +111,15 @@ async def send_welcome(message: types.Message):
 
     user_name = types.User.get_current().username
     user_id = types.User.get_current().id
+    database = bot_sql.MySQL(user_id)
 
-    if not mysql.is_user_exist(user_id):
-        mysql.add_new_user(user_id)
+    if not database.is_user_exist():
+        database.add_new_user()
         b1 = KeyboardButton(buttons.not_login)
         keyboard.add(b1)
     else:
-        data = mysql.get_login_data(user_id)
-        if parser.WebUser(user_id).login(data['login'], data['password']):
+        data = database.get_login_data()
+        if parser.login_user(user_id, data['login'], data['password']):
             keyboard = buttons.main_menu()
         else:
             keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
@@ -142,7 +139,7 @@ async def exit_from_system(message: types.Message):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
     b1 = KeyboardButton(buttons.not_login)
     keyboard.add(b1)
-    mysql.delete_user(user_id)
+    bot_sql.MySQL(user_id).delete_user()
 
     await message.answer('Вы были отключены от системы',
                          reply_markup=keyboard)
@@ -159,6 +156,8 @@ async def buttons_handler(message: types.Message):
 
     a_menu = buttons.analytics_menu_buttons
 
+    database = bot_sql.MySQL(message.from_user.id)
+
     if message.text == buttons.main_menu_buttons[0]:
         await message.answer('Выберите категорию:',
                              reply_markup=buttons.analytics_menu())
@@ -170,19 +169,18 @@ async def buttons_handler(message: types.Message):
     if message.text == buttons.main_menu_buttons[2] \
             or message.text == buttons.go_to_settings \
             or message.text == buttons.setting_menu_buttons[1]:
-        model = mysql.get_view_model(message.from_user.id)
+        model = database.get_view_model()
         if message.text == buttons.setting_menu_buttons[1]:
             if model == 0:
                 model = 1
             else:
                 model = 0
 
-            mysql.set_view_model(message.from_user.id,
-                                 model)
+            database.set_view_model(model)
 
         text = ''
-        alarm_status = mysql.get_alarm_status(message.from_user.id)
-        alarm_lessons = mysql.get_alarm_lessons(message.from_user.id)
+        alarm_status = database.get_alarm_status()
+        alarm_lessons = database.get_alarm_lessons()
         alarm_lessons_text = ''
         i = 0
         for item in alarm_lessons:
@@ -250,14 +248,12 @@ async def buttons_handler(message: types.Message):
                              reply_markup=buttons.alarm_menu(message.from_user.id))
 
     if message.text == buttons.alarm_on:
-        mysql.set_alarm_status(message.from_user.id,
-                               True)
+        database.set_alarm_status(True)
         await message.answer('Уведомления включены',
                              reply_markup=buttons.alarm_menu(message.from_user.id))
 
     if message.text == buttons.alarm_off:
-        mysql.set_alarm_status(message.from_user.id,
-                               False)
+        database.set_alarm_status(False)
         await message.answer('Уведомления выключены',
                              reply_markup=buttons.alarm_menu(message.from_user.id))
 
@@ -275,17 +271,19 @@ async def buttons_handler(message: types.Message):
 
 @dp.message_handler(state=LoginState.S1)
 async def login_1(message: types.Message, state: FSMContext):
+    user_id = types.User.get_current().id
+    database = bot_sql.MySQL(user_id)
+
     if message.text == buttons.cancel:
         keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-        user_id = types.User.get_current().id
         await state.finish()
-        if not mysql.is_user_exist(user_id):
-            mysql.add_new_user(user_id)
+        if not database.is_user_exist():
+            database.add_new_user()
             b1 = KeyboardButton(buttons.not_login)
             keyboard.add(b1)
         else:
-            data = mysql.get_login_data(user_id)
-            if parser.WebUser(user_id).login(data['login'], data['password']):
+            data = database.get_login_data()
+            if parser.login_user(user_id, data['login'], data['password']):
                 keyboard = buttons.main_menu()
             else:
                 keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
@@ -296,9 +294,8 @@ async def login_1(message: types.Message, state: FSMContext):
             reply_markup=keyboard)
         return
 
-    user_id = types.User.get_current().id
-    if not mysql.is_user_exist(user_id):
-        mysql.add_new_user(user_id)
+    if not database.is_user_exist():
+        database.add_new_user()
     await state.update_data(login=message.text)
     await message.answer('Теперь введите пароль')
     await LoginState.S2.set()
@@ -306,18 +303,18 @@ async def login_1(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=LoginState.S2)
 async def login_2(message: types.Message, state: FSMContext):
-    user_id = types.User.get_current().id
+    database = bot_sql.MySQL(types.User.get_current().id)
     if message.text == buttons.cancel:
         keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
         user_id = types.User.get_current().id
         await state.finish()
-        if not mysql.is_user_exist(user_id):
-            mysql.add_new_user(user_id)
+        if not database.is_user_exist():
+            database.add_new_user()
             b1 = KeyboardButton(buttons.not_login)
             keyboard.add(b1)
         else:
-            data = mysql.get_login_data(user_id)
-            if parser.WebUser(user_id).login(data['login'], data['password']):
+            data = database.get_login_data()
+            if parser.login_user(user_id, data['login'], data['password']):
                 keyboard = buttons.main_menu()
             else:
                 keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
@@ -331,12 +328,10 @@ async def login_2(message: types.Message, state: FSMContext):
     await message.answer('Попытка авторизации...')
     data = await state.get_data()
     login = data.get("login")
-    is_login = parser.WebUser(user_id).login(login, message.text)
+    is_login = parser.login_user(user_id, login, message.text)
     if is_login:
-        user_id = types.User.get_current().id
         await state.finish()
-        mysql.set_login_data(
-            user_id,
+        database.set_login_data(
             {
                 'login': login,
                 'password': message.text,
@@ -347,8 +342,6 @@ async def login_2(message: types.Message, state: FSMContext):
         await message.answer(
             'Вы успешно авторизовались',
             reply_markup=buttons.main_menu())
-        student_id = parser.WebUser(user_id).get_id()
-        mysql.set_id(user_id, student_id)
     else:
         await message.answer('Ошибка авторизации. Повторите попытку.')
         await message.answer('Введите свой логин')
@@ -381,14 +374,15 @@ async def if_get_mark_state(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=SetAlarmLessons.alarm)
 async def set_alarm_lessons(message: types.Message, state: FSMContext):
+    database = bot_sql.MySQL(message.from_user.id)
+
     if message.text == buttons.cancel:
         await message.answer('Заверешено', reply_markup=buttons.alarm_setting_menu())
         await state.finish()
         return
 
     if message.text == "*":
-        mysql.set_alarm_lessons(message.from_user.id,
-                                [])
+        database.set_alarm_lessons([])
         await state.finish()
         return await message.answer('Уведомления настроены для всех уроков.', reply_markup=buttons.alarm_setting_menu())
     text = message.text.split(' ')
@@ -418,7 +412,7 @@ async def set_alarm_lessons(message: types.Message, state: FSMContext):
     for item in lessons_list:
         output = output + item + '\n'
 
-    mysql.set_alarm_lessons(message.from_user.id, lessons_list)
+    database.set_alarm_lessons(lessons_list)
 
     await message.answer(output,
                          reply_markup=buttons.alarm_setting_menu())

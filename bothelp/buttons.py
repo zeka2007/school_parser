@@ -88,13 +88,13 @@ def alarm_setting_menu():
 
 
 def alarm_menu(user_id: int):
-    sql = bot_sql.MySQL()
+    sql = bot_sql.MySQL(user_id)
     alarm_menu_buttons = [
         alarm_on,
         alarm_settings,
         go_to_settings
     ]
-    if sql.get_alarm_status(user_id):
+    if sql.get_alarm_status():
         alarm_menu_buttons = [
             alarm_off,
             alarm_settings,
