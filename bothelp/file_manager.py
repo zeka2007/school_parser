@@ -1,4 +1,5 @@
 import os
+import shutil
 
 
 class UserData:
@@ -21,3 +22,8 @@ class UserData:
             for lesson in lessons:
                 write = write + lesson + '\n'
             file.write(write)
+
+    def remove_all_data(self):
+        path = f'{self.data_dir}/{self.student_id}'
+        if os.path.exists(path):
+            shutil.rmtree(path)
