@@ -8,7 +8,6 @@ from datetime import timedelta
 from bothelp import date_format as df
 from bothelp import file_manager as fm
 
-
 agent = 'Mozilla/5.0 (X11; Linux i686; rv:80.0) Gecko/20100101 Firefox/80.0'
 URL = 'https://schools.by/login'
 
@@ -107,7 +106,7 @@ class WebUser:
             'class': None,
             'birthday': None
         }
-        req = requests.get(URL,
+        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}',
                            headers={'user-agent': agent},
                            cookies=self.cookies).content
         soup = BeautifulSoup(req, features="html.parser")
