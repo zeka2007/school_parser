@@ -1,17 +1,23 @@
 import asyncio
 import logging
-import config
+
 from aiogram import Dispatcher, Bot
+
+import config
 from bot_events import register_user_commands
+from bothelp.db import create_database
 
 
 async def main() -> None:
-    logging.basicConfig(level=logging.DEBUG)
+    if config.debug:
+        logging.basicConfig(level=logging.DEBUG)
 
     dp = Dispatcher()
     bot = Bot(config.token)
 
     register_user_commands(dp)
+
+    await create_database()
 
     await dp.start_polling(bot)
 
