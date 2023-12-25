@@ -1,8 +1,18 @@
-# install
+# Общая информация
+[@schools_helper_bot](https://t.me/schools_helper_bot) — неофициальный Telegram клиент для работы с сервисом Schools.by
+Для использования бота необходимо указать свой логин и пароль для входа в электронный дневник, после чего будут доступны следующие функции:
+
+- [x] Сравнение отметок за четверти
+- [x] Подсчет среднего балла по предметам
+- [x] Нахождения способа исправления отметки
+
+# Установка 
+Для запуска бота на своем сервере необходимо установить [Python 3](https://www.python.org/) и [PostgreSQL](https://www.postgresql.org/)
+Затем установить зависимости:
 > pip install -r requirements.txt
-# set token
-insert your token in confing.py (your can get it in [BotFather](https://t.me/BotFather))
-# create database
+Создать необходимые директории:
 > python setup.py
-# run
+И заполнить файл `config.py`
+
+# Запуск
 > python bot.py
