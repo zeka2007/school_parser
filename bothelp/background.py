@@ -1,22 +1,30 @@
 import asyncio
 import logging
 import multiprocessing
-from bothelp import bot_sql, parser
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from bothelp import parser
+from bothelp.db import session_maker, Student
+
 
 # par = parser.WebUser(1134428403)
 # manager = marks_manager.Manager()
 
 
 async def update_data():
-    data = bot_sql.MySQL.get_all_users()
-    for user in data:
-        user_obj = parser.WebUser(user[0])
-        try:
-            user_obj.get_lessons(update=True)
-            user_obj.get_current_quarter(update=True)
-            user_obj.get_current_quarter_full(update=True)
-        except Exception as e:
-            logging.warning(f'{e} for user {user_obj.student_id}')
+    async with session_maker() as session:
+        session: AsyncSession
+        result = await session.execute(select(Student))
+        for user in result.scalars().fetchall():
+            user_obj = parser.WebUser(user, session)
+            try:
+                user_obj.get_lessons(upd=True)
+                await user_obj.get_current_quarter(upd=True)
+                await user_obj.get_current_quarter_full(upd=True)
+            except Exception as e:
+                logging.warning(f'{e} for user {user.user_id}')
 
 
 # async def update_alarm():

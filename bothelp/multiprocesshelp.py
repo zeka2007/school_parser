@@ -1,5 +1,6 @@
 from multiprocessing import Process, Queue
-from bothelp import parser
+
+from bothelp.parser import WebUser
 
 
 # def checker(q):
@@ -14,12 +15,12 @@ from bothelp import parser
 
 
 class Multiprocess:
-    def __init__(self, user_id: int):
-        self.user_id = user_id
+    def __init__(self, web_user: WebUser):
+        self.web_user = web_user
 
     def get_marks_process(self, quarter: int, page: int, q, lesson_name: str = None):
 
-        marks = parser.WebUser(self.user_id).get_all_marks_from_page(quarter, page, lesson_name)
+        marks = self.web_user.get_all_marks_from_page(quarter, page, lesson_name)
         if marks:
             data = {
                 'page': page,
@@ -28,7 +29,7 @@ class Multiprocess:
             q.put(data)
 
     def get_all_marks(self, quarter: int, lesson_name: str = None):
-        weeks = parser.WebUser(self.user_id).get_pages_count(quarter)
+        weeks = self.web_user.get_pages_count(quarter)
 
         q = Queue()
 

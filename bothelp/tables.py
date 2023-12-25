@@ -70,7 +70,6 @@ def quarter_marks_analytics(lessons: list,
 def quarter_marks_analytics_all(lessons: list,
                                 marks: dict):
     result = 'Предмет / 1 / 2 / 3 / 4 четверти\n\n'
-    print(marks)
     for i in range(len(lessons)):
         line = f'{lessons[i]} / {marks[1][i]} / {marks[2][i]} / {marks[3][i]} / {marks[4][i]}\n'
         result = result + line

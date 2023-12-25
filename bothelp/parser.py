@@ -1,30 +1,60 @@
+import datetime
 import logging
+from datetime import timedelta
+from typing import Callable, Dict, Any, Awaitable
 
 import requests
+from aiogram import BaseMiddleware
+from aiogram.dispatcher.flags import get_flag
+from aiogram.types import Message
 from bs4 import BeautifulSoup
-from bothelp import bot_sql
-import datetime
-from datetime import timedelta
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from bothelp import date_format as df
 from bothelp import file_manager as fm
+from bothelp.db import Student, session_maker
 
 agent = 'Mozilla/5.0 (X11; Linux i686; rv:80.0) Gecko/20100101 Firefox/80.0'
 URL = 'https://schools.by/login'
 
 
-def check_login(func):
-    def wrapper(*args, **kwargs):
-        self = args[0]
-        if not self.is_login():
-            data = self.sql.get_login_data()
-            if login_user(self.user_id, data['login'], data['password']) is False:
-                return False
-        return func(*args, **kwargs)
+class LoginCheckMiddleware(BaseMiddleware):
+    async def __call__(
+            self,
+            handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
+            event: Message,
+            data: Dict[str, Any]
+    ) -> Any:
 
-    return wrapper
+        if get_flag(data, 'chat_action') != 'WebService':
+            return await handler(event, data)
+
+        async with session_maker() as session:
+            session: AsyncSession
+            result = await session.execute(select(Student).where(Student.user_id == event.from_user.id))
+            student: Student = result.scalars().one_or_none()
+
+            if WebUser(student, session).is_login():
+                return await handler(event, data)
+            else:
+                return await event.answer('Не удается получить доступ к сервису Schools.by, '
+                                          'используя ваши данные для входа.')
 
 
-def login_user(user_id, login: str, password: str):
+# def check_login(func):
+#     def wrapper(*args, **kwargs):
+#         self = args[0]
+#         if not self.is_login():
+#             data = self.sql.get_login_data()
+#             if login_user(self.user_id, data['login'], data['password']) is False:
+#                 return False
+#         return func(*args, **kwargs)
+#
+#     return wrapper
+
+
+async def login_user(user: Student, session: AsyncSession):
     headers = {
         'user-agent': agent,
         'Referer': URL
@@ -39,8 +69,8 @@ def login_user(user_id, login: str, password: str):
 
     login_data = {
         'csrfmiddlewaretoken': csrftoken,
-        'username': login,
-        'password': password,
+        'username': user.login,
+        'password': user.password,
         '|123': '|123'
     }
     r = client.post(
@@ -53,34 +83,40 @@ def login_user(user_id, login: str, password: str):
     if redirect_url == URL:
         return False
 
-    db = bot_sql.MySQL(user_id)
-    db.set_site_prefix(redirect_url.split('.')[0].replace('https://', ''))
-    db.set_id(int(redirect_url.split('/')[-1]))
+    site_prefix = redirect_url.split('.')[0].replace('https://', '')
+    student_id = int(redirect_url.split('/')[-1])
+
+    csrf_token = ''
+    session_id = ''
 
     for resp in r.history:
-        db.set_login_data(
-            {
-                'login': None,
-                'password': None,
-                'csrf_token': resp.cookies['csrftoken'],
-                'session_id': resp.cookies['sessionid'],
-            }
-        )
+        csrf_token = resp.cookies['csrftoken']
+        session_id = resp.cookies['sessionid']
+
+    await session.execute(update(Student).where(Student.user_id == user.user_id).values(
+        site_prefix=site_prefix,
+        student_id=student_id,
+        csrf_token=csrf_token,
+        session_id=session_id
+    ))
+    await session.commit()
     return True
 
 
 class WebUser:
-    def __init__(self, user_id: int):
+    def __init__(self, student: Student, session: AsyncSession):
 
         self.cookies = {}
+        self.student = student
+        self.session = session
 
-        self.sql = bot_sql.MySQL(user_id)
-
-        self.user_data = self.sql.get_login_data()
-        self.user_id = user_id
-        self.personal_url = f'https://{self.sql.get_site_prefix()}.schools.by'
-
-        self.student_id = self.sql.get_id()
+        self.user_data = {
+            'login': self.student.login,
+            'password': self.student.password,
+            'csrf_token': self.student.csrf_token,
+            'session_id': self.student.session_id
+        }
+        self.personal_url = f'https://{self.student.site_prefix}.schools.by'
 
         if self.user_data is not None:
             if self.user_data['csrf_token'] is not None and self.user_data['session_id'] is not None:
@@ -95,10 +131,10 @@ class WebUser:
                            headers={'user-agent': agent},
                            cookies=self.cookies)
         if get.url == URL:
-            return False
+            if login_user(self.student, self.session) is False:
+                return False
         return True
 
-    @check_login
     def get_student_info(self):
         info = {
             'student_id': None,
@@ -106,12 +142,12 @@ class WebUser:
             'class': None,
             'birthday': None
         }
-        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}',
+        req = requests.get(f'{self.personal_url}/pupil/{self.student.student_id}',
                            headers={'user-agent': agent},
                            cookies=self.cookies).content
         soup = BeautifulSoup(req, features="html.parser")
         info['student_name'] = soup.find('h1').text.replace('\n', '')
-        info['student_id'] = self.student_id
+        info['student_id'] = self.student.student_id
 
         divs = soup.find_all('div', {'class': 'pp_line'})
         for div in divs:
@@ -128,14 +164,13 @@ class WebUser:
 
         return info
 
-    @check_login
     def get_quarter_id(self, quarter: int = 0):
 
-        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik',
+        req = requests.get(f'{self.personal_url}/pupil/{self.student.student_id}/dnevnik',
                            headers={'user-agent': agent},
                            cookies=self.cookies).content
         soup = BeautifulSoup(req, features="html.parser")
-        uls = soup.find_all('ul', {'id': f'db_quarters_menu_{self.student_id}'})
+        uls = soup.find_all('ul', {'id': f'db_quarters_menu_{self.student.student_id}'})
         for ul in uls:
             lis = ul.find_all('li')
             for li in lis:
@@ -144,58 +179,49 @@ class WebUser:
                 if span == f'{quarter} четверть':
                     return a['quarter_id']
 
-    def get_current_quarter(self, update: bool = False):
-        data = self.sql.get_current_quarter()
-        if data and not update:
+    async def get_current_quarter(self, upd: bool = False):
+        data = self.student.current_quarter
+        if data and not upd:
             return data
 
-        if not self.is_login():
-            data = self.sql.get_login_data()
-            if login_user(self.user_id, data['login'], data['password']) is False:
-                return False
-
-        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik',
+        req = requests.get(f'{self.personal_url}/pupil/{self.student.student_id}/dnevnik',
                            headers={'user-agent': agent},
                            cookies=self.cookies).content
         soup = BeautifulSoup(req, features="html.parser")
         num = soup.find('a', {'class': 'current'}).text
         num = int(num.split(' ')[0])
-        logging.info(f'update current quarter for {self.student_id}')
-        self.sql.set_current_quarter(num)
+        logging.info(f'update current quarter for {self.student.student_id}')
+        self.student.current_quarter = num
+        await self.session.commit()
         return num
 
-    def get_current_quarter_full(self, update: bool = False):
-        data = self.sql.get_full_quarter()
-        if data and not update:
+    async def get_current_quarter_full(self, upd: bool = False):
+        data = self.student.full_quarter
+        if data and not upd:
             return data
 
-        if not self.is_login():
-            data = self.sql.get_login_data()
-            if login_user(self.user_id, data['login'], data['password']) is False:
-                return False
-
-        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik',
+        req = requests.get(f'{self.personal_url}/pupil/{self.student.student_id}/dnevnik',
                            headers={'user-agent': agent},
                            cookies=self.cookies).content
         soup = BeautifulSoup(req, features="html.parser")
         num = soup.find('a', {'class': 'current'})['quarter_id']
         num = int(num)
-        logging.info(f'update full quarter for {self.student_id}')
+        logging.info(f'update full quarter for {self.student.student_id}')
 
-        self.sql.set_full_quarter(num)
+        self.student.full_quarter = num
+        await self.session.commit()
         return num
 
-    @check_login
     def get_quarters_marks(self, quarter: int):
 
         q_marks = []
 
-        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik/last-page',
+        req = requests.get(f'{self.personal_url}/pupil/{self.student.student_id}/dnevnik/last-page',
                            headers={'user-agent': agent},
                            cookies=self.cookies).content
 
         soup = BeautifulSoup(req, features="html.parser")
-        table = soup.find('table', {'id': f'daybook-last-page-table-{self.student_id}'})
+        table = soup.find('table', {'id': f'daybook-last-page-table-{self.student.student_id}'})
         body = table.find('tbody')
         trs = body.find_all('tr', {'class': 'marks'})
         for tr in trs:
@@ -208,20 +234,15 @@ class WebUser:
 
         return q_marks
 
-    def get_lessons(self, update: bool = False):
-        file_manager = fm.UserData(self.student_id)
+    def get_lessons(self, upd: bool = False):
+        file_manager = fm.UserData(self.student.student_id)
         data = file_manager.get_lessons()
-        if data is not None and not update:
+        if data is not None and not upd:
             return data
-
-        if not self.is_login():
-            data = self.sql.get_login_data()
-            if login_user(self.user_id, data['login'], data['password']) is False:
-                return False
 
         lessons = []
 
-        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik/last-page',
+        req = requests.get(f'{self.personal_url}/pupil/{self.student.student_id}/dnevnik/last-page',
                            headers={'user-agent': agent},
                            cookies=self.cookies).content
 
@@ -257,16 +278,15 @@ class WebUser:
                         i -= 1
                     lesson_name = ''.join(l_list)
                 lessons.append(lesson_name)
-        logging.info(f'create lessons file for {self.student_id}')
+        logging.info(f'create lessons file for {self.student.student_id}')
         file_manager.set_lessons(lessons)
 
         return lessons
 
-    @check_login
     def get_all_marks(self, quarter: int, lesson_name: str = None):
         interval = {}
 
-        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik/last-page',
+        req = requests.get(f'{self.personal_url}/pupil/{self.student.student_id}/dnevnik/last-page',
                            headers={'user-agent': agent},
                            cookies=self.cookies).content
 
@@ -319,7 +339,7 @@ class WebUser:
             # print(date)
             date_url = date.strftime("%Y-%m-%d")
             req = requests.get(f'{self.personal_url}/pupil/'
-                               f'{self.student_id}/dnevnik/quarter/{full_quarter}/week/{date_url}',
+                               f'{self.student.student_id}/dnevnik/quarter/{full_quarter}/week/{date_url}',
                                headers={'user-agent': agent},
                                cookies=self.cookies).content
 
@@ -348,7 +368,6 @@ class WebUser:
 
         return marks
 
-    @check_login
     def get_all_marks_from_page(self, quarter: int, page: int, lesson_name: str = None):
 
         interval = self.get_intervals()
@@ -387,7 +406,7 @@ class WebUser:
                 # print(date)
                 date_url = date.strftime("%Y-%m-%d")
                 req = requests.get(f'{self.personal_url}/pupil/'
-                                   f'{self.student_id}/dnevnik/quarter/{full_quarter}/week/{date_url}',
+                                   f'{self.student.student_id}/dnevnik/quarter/{full_quarter}/week/{date_url}',
                                    headers={'user-agent': agent},
                                    cookies=self.cookies).content
 
@@ -418,12 +437,11 @@ class WebUser:
 
         return marks
 
-    @check_login
     def get_intervals(self):
 
         interval = {}
 
-        req = requests.get(f'{self.personal_url}/pupil/{self.student_id}/dnevnik/last-page',
+        req = requests.get(f'{self.personal_url}/pupil/{self.student.student_id}/dnevnik/last-page',
                            headers={'user-agent': agent},
                            cookies=self.cookies).content
 
@@ -450,7 +468,6 @@ class WebUser:
 
         return interval
 
-    @check_login
     def get_pages_count(self, quarter: int):
 
         interval = self.get_intervals()

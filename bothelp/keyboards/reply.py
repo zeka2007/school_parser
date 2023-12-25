@@ -1,7 +1,9 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from bothelp import bot_sql
+from bothelp.db import session_maker, Student
 
 back_button_text = '⬅️ Назад'
 
@@ -79,23 +81,26 @@ def alarm_setting_menu():
     return keyboard
 
 
-def alarm_menu(user_id: int):
-    sql = bot_sql.MySQL(user_id)
-    alarm_menu_buttons = [
-        alarm_on,
-        alarm_settings,
-        go_to_settings
-    ]
-    if sql.get_alarm_status():
+async def alarm_menu(user_id: int):
+    async with session_maker() as session:
+        session: AsyncSession
+        result = await session.execute(select(Student).where(Student.user_id == user_id))
         alarm_menu_buttons = [
-            alarm_off,
+            alarm_on,
             alarm_settings,
             go_to_settings
         ]
-    builder = ReplyKeyboardBuilder()
-    for menu_item in alarm_menu_buttons:
-        builder.row(KeyboardButton(text=menu_item))
-    keyboard = builder.as_markup()
-    keyboard.resize_keyboard = True
 
-    return keyboard
+        if result.scalars().one_or_none().alarm_state:
+            alarm_menu_buttons = [
+                alarm_off,
+                alarm_settings,
+                go_to_settings
+            ]
+        builder = ReplyKeyboardBuilder()
+        for menu_item in alarm_menu_buttons:
+            builder.row(KeyboardButton(text=menu_item))
+        keyboard = builder.as_markup()
+        keyboard.resize_keyboard = True
+
+        return keyboard
