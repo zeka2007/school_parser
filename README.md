@@ -8,10 +8,13 @@
 
 # Установка 
 Для запуска бота на своем сервере необходимо установить [Python 3](https://www.python.org/) и [PostgreSQL](https://www.postgresql.org/)
+
 Затем установить зависимости:
 > pip install -r requirements.txt
+
 Создать необходимые директории:
 > python setup.py
+
 И заполнить файл `config.py`
 
 # Запуск
