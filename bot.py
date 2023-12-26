@@ -2,6 +2,8 @@ import asyncio
 import logging
 
 from aiogram import Dispatcher, Bot
+from aiogram.fsm.storage.redis import RedisStorage
+from redis.asyncio import Redis
 
 import config
 from bot_events import register_user_commands
@@ -12,7 +14,7 @@ async def main() -> None:
     if config.debug:
         logging.basicConfig(level=logging.DEBUG)
 
-    dp = Dispatcher()
+    dp = Dispatcher(storage=RedisStorage(Redis()))
     bot = Bot(config.token)
 
     register_user_commands(dp)

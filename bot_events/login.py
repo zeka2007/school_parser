@@ -46,7 +46,7 @@ async def login_1(message: types.Message, state: FSMContext):
                 'Отменено',
                 reply_markup=keyboard)
 
-        await state.update_data(login=message.text)
+        await state.set_data({'login': message.text})
         await message.answer('Теперь введите пароль')
         await state.set_state(LoginState.waiting_for_password)
 
@@ -100,8 +100,10 @@ async def login_2(message: types.Message, state: FSMContext):
             )
 
             await state.update_data(
-                login=login,
-                password=message.text
+                {
+                    'login': login,
+                    'password': message.text
+                }
             )
         else:
             await message.answer('Ошибка авторизации. Повторите попытку.')

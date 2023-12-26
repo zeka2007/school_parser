@@ -7,7 +7,7 @@
 - [x] Нахождения способа исправления отметки
 
 # Установка 
-Для запуска бота на своем сервере необходимо установить [Python 3](https://www.python.org/) и [PostgreSQL](https://www.postgresql.org/)
+Для запуска бота на своем сервере необходимо установить [Python 3](https://www.python.org/) [PostgreSQL](https://www.postgresql.org/) и [Redis](https://redis.io/)
 
 Затем установить зависимости:
 > pip install -r requirements.txt
