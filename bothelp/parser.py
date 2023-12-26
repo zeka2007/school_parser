@@ -35,11 +35,14 @@ class LoginCheckMiddleware(BaseMiddleware):
             result = await session.execute(select(Student).where(Student.user_id == event.from_user.id))
             student: Student = result.scalars().one_or_none()
 
-            if WebUser(student, session).is_login():
-                return await handler(event, data)
-            else:
+            if student is not None:
+                if await WebUser(student, session).is_login():
+                    return await handler(event, data)
+
                 return await event.answer('Не удается получить доступ к сервису Schools.by, '
                                           'используя ваши данные для входа.')
+            else:
+                return await event.answer('Вы не зарегистрированы!')
 
 
 # def check_login(func):
@@ -126,12 +129,13 @@ class WebUser:
                     'slc_cookie': '{slcMakeBetter}{headerPopupsIsClosed}'
                 }
 
-    def is_login(self):
+    async def is_login(self):
         get = requests.get(URL,
                            headers={'user-agent': agent},
                            cookies=self.cookies)
         if get.url == URL:
-            if login_user(self.student, self.session) is False:
+            is_login = await login_user(self.student, self.session)
+            if is_login is False:
                 return False
         return True
 

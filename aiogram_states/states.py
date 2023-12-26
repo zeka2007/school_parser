@@ -12,3 +12,12 @@ class IfGetMarks(StatesGroup):
 
 class SetAlarmLessons(StatesGroup):
     alarm = State()
+
+
+class AdminRequestId(StatesGroup):
+    state = State()
+
+
+class SetAdminLevel(StatesGroup):
+    get_id = State()
+    get_level = State()

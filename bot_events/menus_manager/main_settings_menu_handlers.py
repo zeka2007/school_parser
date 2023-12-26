@@ -56,5 +56,6 @@ async def settings_menu_handler(message: types.Message):
                 model,
                 alarm_lessons=alarm_lessons_text
             )
+
         await message.answer(result_text,
                              reply_markup=reply.setting_menu())

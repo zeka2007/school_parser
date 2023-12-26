@@ -1,3 +1,6 @@
+import datetime
+
+
 def int_r(num):
     num = int(num + (0.5 if num > 0 else -0.5))
     return num
@@ -224,7 +227,10 @@ def setting_menu_table(user_id: int,
                        in_class: str = None,
                        birthday: str = None,
                        alarm_lessons: str = 'Все'):
-    text = ''
+    text = f'ℹ️ Общая информация:\n' \
+           f'🆔 Telegram ID: {user_id}\n' \
+           f'👤 Имя в Telegram: {tg_name}\n'
+
     model_type = 'Неполная'
     authorization = '✅ Да'
 
@@ -233,17 +239,14 @@ def setting_menu_table(user_id: int,
 
         if not school_name or not in_class or not birthday:
             authorization = '❌ Нет'
-            text = text + f'ℹ️ Общая информация:\n' \
-                          f'🆔 Telegram ID: {user_id}\n' \
-                          f'👤 Имя в Telegram: {tg_name}\n' \
-                          f'🤖 Авторизован: {authorization}\n'
+
         else:
-            text = text + f'🆔 Telegram ID: {user_id}\n' \
-                          f'👤 Имя в Telegram: {tg_name}\n' \
-                          f'👤 ФИО: {school_name}\n' \
-                          f'🆔 Идентификатор schools.by: {school_id}\n' \
-                          f'🤖 Авторизован: {authorization}\n\n' \
-                          f'⚙️ Настройки:\n'
+            text += f'👤 ФИО: {school_name}\n' \
+                    f'🆔 Идентификатор schools.by: {school_id}\n' \
+                    f'🎂 День рождения: {birthday}\n' \
+                    f'🪪 Класс: {in_class}\n' \
+
+    text += f'🤖 Авторизован: {authorization}\n\n'
 
     if view_model == 0:
         text = f'⚙️ Настройки:\n'
@@ -255,6 +258,42 @@ def setting_menu_table(user_id: int,
         text = text + f'🔔 Уведомления: ❌ Выключены\n'
 
     text = text + f'👁️ Модель вида: {model_type}'
+
+    return text
+
+
+def admin_user_info_table(user_id: int,
+                          reg_date: datetime.datetime,
+                          alarm_status: bool,
+                          is_block: bool,
+                          admin_level: int,
+                          school_id: int = None,
+                          school_name: str = None,
+                          in_class: str = None,
+                          birthday: str = None,
+                          alarm_lessons: str = 'Все'):
+    authorization = '✅ Да'
+    text = f'ℹ️ Общая информация:\n' \
+           f'🆔 Telegram ID: {user_id}\n' \
+           f'🗓️ Дата регистрации: {reg_date}\n' \
+           f'⬆️ Уровень администратора: {admin_level}\n' \
+           f'❌ Заблокирован: {is_block}\n\n'
+
+    if not school_name or not in_class or not birthday:
+        authorization = '❌ Нет'
+
+    else:
+        text += f'👤 ФИО: {school_name}\n' \
+                f'🎂 День рождения: {birthday}\n' \
+                f'🆔 Идентификатор schools.by: {school_id}\n' \
+                f'🪪 Класс: {in_class}\n' \
+
+    text += f'🤖 Авторизован: {authorization}\n\n'
+    if alarm_status:
+        text = text + f'🔔 Уведомления: ✅ Включены\n' \
+                      f'☑️ Выбранные предметы: {alarm_lessons}\n'
+    else:
+        text = text + f'🔔 Уведомления: ❌ Выключены\n'
 
     return text
 

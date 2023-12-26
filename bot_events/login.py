@@ -21,9 +21,10 @@ async def get_cancel_markup(user_id: int, session: AsyncSession) -> ReplyKeyboar
         keyboard = reply.not_login
     else:
         if await parser.login_user(student, session):
-            keyboard = reply.main_menu
+            keyboard = reply.main_menu()
         else:
             keyboard = reply.not_login
+
     return keyboard
 
 

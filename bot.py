@@ -6,7 +6,7 @@ from aiogram.fsm.storage.redis import RedisStorage
 from redis.asyncio import Redis
 
 import config
-from bot_events import register_user_commands
+from bot_events import register_user_commands, register_admin_commands
 from bothelp.db import create_database
 
 
@@ -18,6 +18,7 @@ async def main() -> None:
     bot = Bot(config.token)
 
     register_user_commands(dp)
+    register_admin_commands(dp)
 
     await create_database()
 

@@ -1,8 +1,12 @@
-__all__ = ['register_user_commands']
+__all__ = ['register_user_commands', 'register_admin_commands']
 
 from aiogram import Router, F
 
-from aiogram_states.states import LoginState, SetAlarmLessons, IfGetMarks
+from aiogram_states.states import LoginState, SetAlarmLessons, IfGetMarks, AdminRequestId, SetAdminLevel
+from bot_events.administration.base_commands import admin_help, admin_commands
+from bot_events.administration.middleware import CheckAdminLevelMiddleware
+from bot_events.administration.user_view import get_user_info_state
+from bot_events.administration.hight_level_commands import set_admin_level_get_id, set_admin_level_get_login
 from bot_events.base_commands import send_welcome, exit_from_system, test_cmd
 from bot_events.login import login_menu, login_1, login_2, confirm_data_save, denied_data_save
 from bot_events.menus_manager.main_menu_handlers import main_menu_handler, analytics_menu_handler, fix_menu_handler
@@ -23,6 +27,7 @@ from bot_events.menus_manager.fix_menu_handlers import marks_fix_handler, \
     if_get_callback, \
     if_get_marks_state
 
+
 from bothelp.keyboards import reply, get_button_text
 from bothelp.parser import LoginCheckMiddleware
 from aiogram.filters import Command, CommandStart
@@ -30,7 +35,8 @@ from aiogram.filters import Command, CommandStart
 
 def register_user_commands(router: Router) -> None:
 
-    router.message.middleware(LoginCheckMiddleware())
+    router.message.middleware.register(LoginCheckMiddleware())
+    router.callback_query.middleware.register(LoginCheckMiddleware())
 
     router.message.register(test_cmd, Command(commands=['test']), flags={'chat_action': 'WebService'})
     # Base commands
@@ -88,3 +94,17 @@ def register_user_commands(router: Router) -> None:
                                    flags={'chat_action': 'WebService'})
 
     router.message.register(if_get_marks_state, IfGetMarks.state)
+
+
+def register_admin_commands(router: Router) -> None:
+    router.message.middleware.register(CheckAdminLevelMiddleware())
+    for command in admin_commands:
+        router.message.register(
+            command['func'],
+            Command(command['command'].command),
+            flags={'req_level': command['level']}
+        )
+    router.message.register(get_user_info_state, AdminRequestId.state)
+
+    router.message.register(set_admin_level_get_id, SetAdminLevel.get_id)
+    router.message.register(set_admin_level_get_login, SetAdminLevel.get_level)
