@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import func, BigInteger, ARRAY, VARCHAR, Column
+from sqlalchemy import func, BigInteger, ARRAY, VARCHAR, Column, Integer, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import BaseModel
@@ -28,11 +28,11 @@ class Student(BaseModel):
     alarm_state: Mapped[bool] = mapped_column(unique=False, default=False)
     alarm_lessons = Column(ARRAY(VARCHAR), unique=False, default=['*'])
 
-    admin_level: Mapped[int] = Column(unique=False, nullable=False, default=0)
+    admin_level: Mapped[int] = Column(Integer, unique=False, nullable=False, default=0)
 
     lessons_cache = Column(ARRAY(VARCHAR), unique=False, nullable=True)
 
-    is_block: Mapped[bool] = Column(unique=False, nullable=False, default=False)
+    is_block: Mapped[bool] = Column(Boolean, unique=False, nullable=False, serdefault=False)
 
     def __str__(self) -> str:
         return f'<Student:{self.user_id}>'
