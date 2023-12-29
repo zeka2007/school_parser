@@ -32,7 +32,7 @@ class Student(BaseModel):
 
     lessons_cache = Column(ARRAY(VARCHAR), unique=False, nullable=True)
 
-    is_block: Mapped[bool] = Column(Boolean, unique=False, nullable=False, serdefault=False)
+    is_block: Mapped[bool] = Column(Boolean, unique=False, nullable=False, default=False)
 
     def __str__(self) -> str:
         return f'<Student:{self.user_id}>'

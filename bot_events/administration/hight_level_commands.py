@@ -14,10 +14,6 @@ async def set_admin_level(message: types.Message, state: FSMContext):
 
 async def set_admin_level_get_id(message: types.Message, state: FSMContext):
     async with session_maker() as session:
-        if message.text == '/cancel':
-            await state.set_state()
-            await message.answer('Отменено')
-            return
 
         if not message.text.isnumeric():
             await state.set_state(SetAdminLevel.get_id)
@@ -36,11 +32,6 @@ async def set_admin_level_get_id(message: types.Message, state: FSMContext):
 
 async def set_admin_level_get_login(message: types.Message, state: FSMContext):
     async with session_maker() as session:
-        if message.text == '/cancel':
-            await state.set_state()
-            await message.answer('Отменено')
-            return
-
         if not message.text.isnumeric():
             await state.set_state(SetAdminLevel.get_level)
             return message.answer('Введите целое положительное число!')

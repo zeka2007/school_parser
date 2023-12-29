@@ -1,4 +1,5 @@
-__all__ = ['BaseModel', 'Student', 'session_maker', 'create_database', 'async_engine']
+__all__ = ['BaseModel', 'Student', 'Message',
+           'session_maker', 'create_database', 'async_engine']
 
 from sqlalchemy import URL
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -6,6 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 import config
 from .base import BaseModel
 from .student import Student
+from .messages import Message
 
 db_url = URL.create(
         "postgresql+asyncpg",

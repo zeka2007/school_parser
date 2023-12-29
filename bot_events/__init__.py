@@ -4,8 +4,10 @@ from aiogram import Router, F
 
 from aiogram_states.states import LoginState, SetAlarmLessons, IfGetMarks, AdminRequestId, SetAdminLevel
 from bot_events.administration.base_commands import admin_help, admin_commands
-from bot_events.administration.middleware import CheckAdminLevelMiddleware
-from bot_events.administration.user_view import get_user_info_state
+from bot_events.administration.middleware import CheckAdminLevelMiddleware, CancelStateMiddleware
+from bot_events.administration.notifications import send_notify_method, get_notify_additional_info, get_notify_text, \
+    SendMessageState, get_notify_picture, skip_photo_pic, send_notify_action
+from bot_events.administration.user_view import get_user_info_state, get_user_info_method
 from bot_events.administration.hight_level_commands import set_admin_level_get_id, set_admin_level_get_login
 from bot_events.base_commands import send_welcome, exit_from_system, test_cmd
 from bot_events.login import login_menu, login_1, login_2, confirm_data_save, denied_data_save
@@ -27,14 +29,12 @@ from bot_events.menus_manager.fix_menu_handlers import marks_fix_handler, \
     if_get_callback, \
     if_get_marks_state
 
-
-from bothelp.keyboards import reply, get_button_text
+from bothelp.keyboards import reply, get_button_text, inline
 from bothelp.parser import LoginCheckMiddleware
 from aiogram.filters import Command, CommandStart
 
 
 def register_user_commands(router: Router) -> None:
-
     router.message.middleware.register(LoginCheckMiddleware())
     router.callback_query.middleware.register(LoginCheckMiddleware())
 
@@ -97,14 +97,58 @@ def register_user_commands(router: Router) -> None:
 
 
 def register_admin_commands(router: Router) -> None:
+    # Middlewares register
     router.message.middleware.register(CheckAdminLevelMiddleware())
+    router.message.middleware.register(CancelStateMiddleware())
+    router.callback_query.middleware.register(CheckAdminLevelMiddleware())
+
+    # Text commands
     for command in admin_commands:
         router.message.register(
             command['func'],
             Command(command['command'].command),
             flags={'req_level': command['level']}
         )
-    router.message.register(get_user_info_state, AdminRequestId.state)
 
-    router.message.register(set_admin_level_get_id, SetAdminLevel.get_id)
-    router.message.register(set_admin_level_get_login, SetAdminLevel.get_level)
+    # Get user info
+    router.message.register(get_user_info_state, AdminRequestId.state,
+                            flags={'can_be_canceled': True})
+    router.callback_query.register(get_user_info_method,
+                                   F.data.startswith('get_user_method'),
+                                   flags={'req_level': 1})
+
+    # Set admin level
+    router.message.register(set_admin_level_get_id, SetAdminLevel.get_id,
+                            flags={'can_be_canceled': True})
+    router.message.register(set_admin_level_get_login, SetAdminLevel.get_level,
+                            flags={'can_be_canceled': True})
+
+    # Send notifications
+    router.callback_query.register(send_notify_method,
+                                   F.data.startswith('user_type'),
+                                   flags={'req_level': 3})
+    router.message.register(get_notify_additional_info, SendMessageState.get_additional_info,
+                            flags={
+                                'req_level': 3,
+                                'can_be_canceled': True
+                            })
+
+    router.message.register(get_notify_text, SendMessageState.get_text,
+                            flags={
+                                'req_level': 3,
+                                'can_be_canceled': True
+                            })
+    router.callback_query.register(skip_photo_pic,
+                                   F.data == inline.skip_photo_pic_btn.inline_keyboard[0][0].callback_data,
+                                   SendMessageState.get_picture)
+    router.message.register(get_notify_picture,
+                            F.photo,
+                            SendMessageState.get_picture,
+                            flags={
+                                'req_level': 3,
+                                'can_be_canceled': True
+                            })
+
+    router.callback_query.register(send_notify_action,
+                                   F.data.startswith('notify_dialog_'),
+                                   flags={'req_level': 3})
