@@ -1,4 +1,4 @@
-import datetime
+from bothelp.db import Student
 
 
 def int_r(num):
@@ -218,42 +218,38 @@ def lessons_if_get_mark_table(marks: list, lesson: str):
     return text
 
 
-def setting_menu_table(user_id: int,
+def setting_menu_table(student: Student,
                        tg_name: str,
-                       alarm_status: bool,
-                       view_model: int,
-                       school_id: int = None,
                        school_name: str = None,
                        in_class: str = None,
-                       birthday: str = None,
-                       alarm_lessons: str = 'Все'):
+                       birthday: str = None,):
     text = f'ℹ️ Общая информация:\n' \
-           f'🆔 Telegram ID: {user_id}\n' \
+           f'🆔 Telegram ID: {student.user_id}\n' \
            f'👤 Имя в Telegram: {tg_name}\n'
 
     model_type = 'Неполная'
-    authorization = '✅ Да'
+    if student.login is None or student.password is None:
+        authorization = '🔐 Через токен, логин и пароль не сохранены'
+    else:
+        authorization = '🔑 По логину и паролю'
 
-    if view_model != 0:
+    if student.full_view_model:
         model_type = 'Расширенная'
 
-        if not school_name or not in_class or not birthday:
-            authorization = '❌ Нет'
-
-        else:
-            text += f'👤 ФИО: {school_name}\n' \
-                    f'🆔 Идентификатор schools.by: {school_id}\n' \
-                    f'🎂 День рождения: {birthday}\n' \
-                    f'🪪 Класс: {in_class}\n' \
+        text += f'👤 ФИО: {school_name}\n' \
+                f'🆔 Идентификатор schools.by: {student.student_id}\n' \
+                f'🎂 День рождения: {birthday}\n' \
+                f'🪪 Класс: {in_class}\n'
 
     text += f'🤖 Авторизован: {authorization}\n\n'
 
-    if view_model == 0:
+    if not student.full_view_model:
         text = f'⚙️ Настройки:\n'
+        text += f'🤖 Авторизован: {authorization}\n'
 
-    if alarm_status:
+    if student.alarm_state:
         text = text + f'🔔 Уведомления: ✅ Включены\n' \
-                      f'☑️ Выбранные предметы: {alarm_lessons}\n'
+                      f'☑️ Выбранные предметы: {" ".join(student.alarm_lessons)}\n'
     else:
         text = text + f'🔔 Уведомления: ❌ Выключены\n'
 
@@ -262,22 +258,16 @@ def setting_menu_table(user_id: int,
     return text
 
 
-def admin_user_info_table(user_id: int,
-                          reg_date: datetime.datetime,
-                          alarm_status: bool,
-                          is_block: bool,
-                          admin_level: int,
-                          school_id: int = None,
+def admin_user_info_table(student: Student,
                           school_name: str = None,
                           in_class: str = None,
-                          birthday: str = None,
-                          alarm_lessons: str = 'Все'):
+                          birthday: str = None):
     authorization = '✅ Да'
     text = f'ℹ️ Общая информация:\n' \
-           f'🆔 Telegram ID: {user_id}\n' \
-           f'🗓️ Дата регистрации: {reg_date}\n' \
-           f'⬆️ Уровень администратора: {admin_level}\n' \
-           f'❌ Заблокирован: {is_block}\n\n'
+           f'🆔 Telegram ID: {student.user_id}\n' \
+           f'🗓️ Дата регистрации: {student.reg_date}\n' \
+           f'⬆️ Уровень администратора: {student.admin_level}\n' \
+           f'❌ Заблокирован: {student.is_block}\n\n'
 
     if not school_name or not in_class or not birthday:
         authorization = '❌ Нет'
@@ -285,13 +275,13 @@ def admin_user_info_table(user_id: int,
     else:
         text += f'👤 ФИО: {school_name}\n' \
                 f'🎂 День рождения: {birthday}\n' \
-                f'🆔 Идентификатор schools.by: {school_id}\n' \
+                f'🆔 Идентификатор schools.by: {student.student_id}\n' \
                 f'🪪 Класс: {in_class}\n' \
 
     text += f'🤖 Авторизован: {authorization}\n\n'
-    if alarm_status:
+    if student.alarm_state:
         text = text + f'🔔 Уведомления: ✅ Включены\n' \
-                      f'☑️ Выбранные предметы: {alarm_lessons}\n'
+                      f'☑️ Выбранные предметы: {" ".join(student.alarm_lessons)}\n'
     else:
         text = text + f'🔔 Уведомления: ❌ Выключены\n'
 
@@ -303,7 +293,8 @@ def set_alarm_lessons(lessons: list):
            'Вы должны выбрать предметы, о которых будут отправляться уведомления.\n' \
            'Для этого напишите цифры соответствующих предметов, разделяя их пробелом\n' \
            'Пример: 3 5 6\n' \
-           'Для выбора всех предметов отправьте *\n\n' \
+           'Для выбора всех предметов отправьте *\n' \
+           'Для отмены отправьте /cancel\n\n' \
            'Предметы:\n'
 
     i = 1

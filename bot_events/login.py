@@ -31,6 +31,16 @@ async def get_cancel_markup(user_id: int, session: AsyncSession) -> ReplyKeyboar
 async def login_menu(message: types.Message, state: FSMContext):
 
     await message.answer('Введите свой логин', reply_markup=reply.cancel)
+    async with session_maker() as session:
+        session: AsyncSession
+        result = await session.execute(select(Student).where(Student.user_id == message.from_user.id))
+        obj: Student = result.scalars().one_or_none()
+        if obj is None:
+            new_student = Student(
+                user_id=message.from_user.id
+            )
+            session.add(new_student)
+            await session.commit()
     await state.set_state(LoginState.waiting_for_login)
 
 
@@ -46,8 +56,10 @@ async def login_1(message: types.Message, state: FSMContext):
             await message.answer(
                 'Отменено',
                 reply_markup=keyboard)
+            return
 
         await state.set_data({'login': message.text})
+        await message.delete()
         await message.answer('Теперь введите пароль')
         await state.set_state(LoginState.waiting_for_password)
 
@@ -65,6 +77,7 @@ async def login_2(message: types.Message, state: FSMContext):
                 reply_markup=keyboard)
             return
 
+        await message.delete()
         await message.answer('Попытка авторизации...')
         data = await state.get_data()
         login = data.get("login")
@@ -78,14 +91,6 @@ async def login_2(message: types.Message, state: FSMContext):
         is_login = await parser.login_user(student, session)
         if is_login:
             await state.set_state()
-            # database.set_login_data(
-            #     {
-            #         'login': login,
-            #         'password': message.text,
-            #         'csrf_token': None,
-            #         'session_id': None
-            #     }
-            # )
             await message.answer(
                 'Вы успешно авторизовались',
                 reply_markup=reply.main_menu())
@@ -97,7 +102,8 @@ async def login_2(message: types.Message, state: FSMContext):
                 'Благодаря этому вы можете отказаться от сохранения ваших данных для авторизации в базу бота, '
                 'ведь для получения информации будет использован токен, который не связан с вашим логином и паролем, '
                 'Однако в случае устаревания токена бот снова потребует ваши данные',
-                reply_markup=inline.save_data_inline_menu()
+                reply_markup=inline.save_data_inline_menu(),
+                parse_mode='Markdown'
             )
 
             await state.update_data(

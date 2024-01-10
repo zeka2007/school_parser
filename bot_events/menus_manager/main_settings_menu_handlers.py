@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bothelp import parser, tables
 from bothelp.db import session_maker, Student
-from bothelp.keyboards import reply, get_button_text
+from bothelp.keyboards import reply, get_button_text, inline
 
 
 async def settings_menu_handler(message: types.Message):
@@ -13,7 +13,7 @@ async def settings_menu_handler(message: types.Message):
         result = await session.execute(select(Student).where(Student.user_id == message.from_user.id))
         student: Student = result.scalars().one_or_none()
         model: bool = student.full_view_model
-        if message.text == get_button_text(reply.setting_menu(), 1):
+        if message.text == get_button_text(reply.setting_menu(), 0, 1):
             model = not model
 
             await session.execute(update(Student).where(Student.user_id == message.from_user.id).values(
@@ -21,7 +21,6 @@ async def settings_menu_handler(message: types.Message):
             ))
             await session.commit()
 
-        alarm_status = student.alarm_state
         alarm_lessons = student.alarm_lessons
         alarm_lessons_text = ''
         i = 0
@@ -32,30 +31,42 @@ async def settings_menu_handler(message: types.Message):
                 alarm_lessons_text = alarm_lessons_text + item + '\n'
             i += 1
 
-        if alarm_lessons == '*':
-            alarm_lessons_text = 'Все'
-
-        if model != 0:
-            data = parser.WebUser(student, session).get_student_info()
+        if model:
+            data = await parser.WebUser(student, session).get_student_info()
             result_text = tables.setting_menu_table(
-                message.from_user.id,
+                student,
                 message.from_user.first_name,
-                alarm_status,
-                model,
-                int(data['student_id']),
                 data['student_name'],
                 data['class'],
-                data['birthday'],
-                alarm_lessons_text
+                data['birthday']
             )
+
         else:
             result_text = tables.setting_menu_table(
-                message.from_user.id,
-                message.from_user.first_name,
-                alarm_status,
-                model,
-                alarm_lessons=alarm_lessons_text
+                student,
+                message.from_user.first_name
             )
 
         await message.answer(result_text,
                              reply_markup=reply.setting_menu())
+
+
+async def update_all_data(message: types.Message):
+    async with session_maker() as session:
+        session: AsyncSession
+        result = await session.execute(select(Student).where(
+            Student.user_id == message.from_user.id
+        ))
+        student: Student = result.scalars().one_or_none()
+        web_user = parser.WebUser(student, session)
+        await web_user.get_current_quarter(True)
+        await web_user.get_current_quarter_full(True)
+        await web_user.get_lessons(True)
+        await message.answer(
+            'Информация об уроках и четвертях обновлена'
+        )
+
+
+async def notifications_menu_handler(message: types.Message):
+    await message.answer('Параметры уведомлений:',
+                         reply_markup=inline.notification_settings_list_menu())

@@ -1,12 +1,11 @@
+import json
 import os
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bothelp import parser, multiprocesshelp
 from bot import send_notify
-import json
-
+from bothelp import parser
 from bothelp.db import session_maker, Student
 
 USER_ID: int = 0
@@ -79,10 +78,10 @@ async def get_data_for_json(user_id: int):
         session: AsyncSession
         result = await session.execute(select(Student).where(Student.user_id == user_id))
         web_user = parser.WebUser(result.scalars().one_or_none(), session)
-        lessons = web_user.get_lessons()
+        lessons = await web_user.get_lessons()
         for lesson in lessons:
 
-            marks = multiprocesshelp.Multiprocess(web_user).get_all_marks(
+            marks = await web_user.get_all_marks(
                 await web_user.get_current_quarter(),
                 lesson
             )

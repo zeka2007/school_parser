@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiogram_states.states import IfGetMarks
-from bothelp import parser, tables, multiprocesshelp
+from bothelp import parser, tables
 from bothelp.db import session_maker, Student
 from bothelp.keyboards import inline, reply, get_button_text
 
@@ -31,8 +31,9 @@ async def marks_fix_callback(callback_query: types.CallbackQuery):
         user_obj = parser.WebUser(result.scalars().one_or_none(), session)
         wait_message = await callback_query.message.answer('Сбор информации...')
         num = await user_obj.get_current_quarter()
-        lesson = user_obj.get_lessons()[int(callback_query.data.split('_')[1])]
-        marks = multiprocesshelp.Multiprocess(user_obj).get_all_marks(num, lesson)
+        lesson = await user_obj.get_lessons()
+        lesson = lesson[int(callback_query.data.split('_')[1])]
+        marks = await user_obj.get_all_marks(num, lesson)
         text = tables.lessons_marks_fix_table(marks, lesson)
         await wait_message.edit_text(text)
 
@@ -46,8 +47,9 @@ async def if_get_callback(callback_query: types.CallbackQuery, state: FSMContext
         user_obj = parser.WebUser(result.scalars().one_or_none(), session)
         wait_message = await callback_query.message.answer('Сбор информации...')
         num = await user_obj.get_current_quarter()
-        lesson = user_obj.get_lessons()[int(callback_query.data.split('_')[1])]
-        marks = multiprocesshelp.Multiprocess(user_obj).get_all_marks(num, lesson)
+        lesson = await user_obj.get_lessons()
+        lesson = lesson[int(callback_query.data.split('_')[1])]
+        marks = await user_obj.get_all_marks(num, lesson)
         text = tables.lessons_if_get_mark_table(marks, lesson)
         await state.set_data(marks)
         await state.set_state(IfGetMarks.state)

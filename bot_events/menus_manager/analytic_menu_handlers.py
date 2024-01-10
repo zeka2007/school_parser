@@ -2,7 +2,7 @@ from aiogram import types
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bothelp import parser, tables, multiprocesshelp
+from bothelp import parser, tables
 from bothelp.db import session_maker, Student
 from bothelp.keyboards import inline
 
@@ -27,19 +27,19 @@ async def quarter_analytic_callback(callback_query: types.CallbackQuery):
         result = await session.execute(select(Student).where(Student.user_id == callback_query.from_user.id))
         user_obj = parser.WebUser(result.scalars().one_or_none(), session)
 
-        lessons = user_obj.get_lessons()
+        lessons = await user_obj.get_lessons()
         if quarter == 5:
             marks_dict = {}
             for i in range(1, 5):
-                marks_q = user_obj.get_quarters_marks(i)
+                marks_q = await user_obj.get_quarters_marks(i)
                 marks_dict[i] = marks_q
             text = tables.quarter_marks_analytics_all(lessons,
                                                       marks_dict)
             await wait_message.edit_text(text)
 
         if 1 < quarter < 5:
-            marks = user_obj.get_quarters_marks(quarter)
-            old_marks = user_obj.get_quarters_marks(quarter - 1)
+            marks = await user_obj.get_quarters_marks(quarter)
+            old_marks = await user_obj.get_quarters_marks(quarter - 1)
 
             text = tables.quarter_marks_analytics(lessons, marks, old_marks)
 
@@ -55,8 +55,9 @@ async def marks_analytic_callback(callback_query: types.CallbackQuery):
         user_obj = parser.WebUser(result.scalars().one_or_none(), session)
         wait_message = await callback_query.message.answer('Сбор информации...')
         num = await user_obj.get_current_quarter()
-        lesson = user_obj.get_lessons()[int(callback_query.data.split('_')[1])]
-        marks = multiprocesshelp.Multiprocess(user_obj).get_all_marks(num, lesson)
+        lesson = await user_obj.get_lessons()
+        lesson = lesson[int(callback_query.data.split('_')[1])]
+        marks = await user_obj.get_all_marks(num, lesson)
         text = tables.lessons_marks_table(marks, lesson)
         await wait_message.edit_text(text)
     # await core_bot.send_message(user_id, str(time.time() - timer))

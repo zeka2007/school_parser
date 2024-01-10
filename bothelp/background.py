@@ -20,7 +20,7 @@ async def update_data():
         for user in result.scalars().fetchall():
             user_obj = parser.WebUser(user, session)
             try:
-                user_obj.get_lessons(upd=True)
+                await user_obj.get_lessons(upd=True)
                 await user_obj.get_current_quarter(upd=True)
                 await user_obj.get_current_quarter_full(upd=True)
             except Exception as e:

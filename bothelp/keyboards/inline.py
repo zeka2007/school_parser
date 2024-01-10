@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bothelp import parser
 from bothelp.db import session_maker, Student
 
-
 skip_photo_pic_btn = InlineKeyboardMarkup(
     inline_keyboard=[
         [
@@ -19,13 +18,35 @@ skip_photo_pic_btn = InlineKeyboardMarkup(
 )
 
 
+def notification_settings_list_menu():
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text='Уведомления об отметках',
+            callback_data='notif_settings_type_lessons'
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text='Уведомления об обновлениях',
+            callback_data='notif_settings_type_updates'
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text='Рассылки',
+            callback_data='notif_settings_type_newsletters'
+        )
+    )
+    return builder.as_markup()
+
+
 def quarter_inline_menu():
     builder = InlineKeyboardBuilder()
-    [builder.button(text=f'{x-1} и {x}', callback_data=f'quarter{x}') for x in range(2, 5)]
+    [builder.button(text=f'{x - 1} и {x}', callback_data=f'quarter{x}') for x in range(2, 5)]
 
     builder.row(
-        InlineKeyboardButton
-        (
+        InlineKeyboardButton(
             text='За все четверти',
             callback_data='quarter5'
         )
@@ -40,7 +61,7 @@ async def lessons_inline_menu(user_id: int, tag: str = 'lesson'):
         session: AsyncSession
         result = await session.execute(select(Student).where(Student.user_id == user_id))
         par = parser.WebUser(result.scalars().one_or_none(), session)
-        lessons = par.get_lessons()
+        lessons = await par.get_lessons()
         counter = 0
         builder = InlineKeyboardBuilder()
 
@@ -68,6 +89,48 @@ def save_data_inline_menu():
     ))
 
     return builder.as_markup()
+
+
+def notifications_menu(status: bool, alarm_type: str, only_state: bool = False):
+    builder = InlineKeyboardBuilder()
+
+    if status:
+        builder.row(
+            InlineKeyboardButton(
+                text='Выключить',
+                callback_data=f'set_notification_{alarm_type}_off'
+            )
+        )
+    else:
+        builder.row(
+            InlineKeyboardButton(
+                text='Включить',
+                callback_data=f'set_notification_{alarm_type}_on'
+            )
+        )
+    if not only_state:
+        builder.row(
+            InlineKeyboardButton(
+                text='Изменить уроки',
+                callback_data='set_lessons_to_alarm'
+            )
+        )
+        builder.row(
+            InlineKeyboardButton(
+                text='Изменить период проверки',
+                callback_data='set_period_to_alarm'
+            )
+        )
+    builder.row(
+        InlineKeyboardButton(
+            text='Назад',
+            callback_data='back_to_notif_settings'
+        )
+    )
+
+    keyboard = builder.as_markup()
+
+    return keyboard
 
 
 def get_user_method_menu():

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bothelp import parser, file_manager
 from bothelp.db import session_maker, Student
 from bothelp.keyboards import reply
+from misc import redis
 
 
 async def test_cmd(message: types.Message):
@@ -21,13 +22,7 @@ async def send_welcome(message: types.Message, state: FSMContext):
         result = await session.execute(select(Student).where(Student.user_id == user_id))
         obj: Student = result.scalars().one_or_none()
         if obj is None:
-            new_student = Student(
-                user_id=user_id
-            )
-            session.add(new_student)
-            await session.commit()
             keyboard = reply.not_login
-
         else:
             if await parser.login_user(obj, session):
                 keyboard = reply.main_menu()
@@ -49,6 +44,8 @@ async def exit_from_system(message: types.Message, state: FSMContext):
 
         await session.execute(delete(Student).where(Student.user_id == user_id))
         await session.commit()
+
+        await redis.delete('is_login:' + str(message.from_user.id))
 
         keyboard = reply.not_login
 

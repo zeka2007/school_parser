@@ -60,18 +60,12 @@ async def get_user_info_state(message: types.Message, state: FSMContext):
             await state.set_state()
             return await message.answer('Пользователь не авторизован')
 
-        user_info = user_obj.get_student_info()
+        user_info = await user_obj.get_student_info()
         text = admin_user_info_table(
-            student.user_id,
-            student.reg_date,
-            student.alarm_state,
-            student.is_block,
-            student.admin_level,
-            user_info['student_id'],
+            student,
             user_info['student_name'],
             user_info['class'],
-            user_info['birthday'],
-            ','.join(student.alarm_lessons)
+            user_info['birthday']
         )
 
         await message.answer(text)

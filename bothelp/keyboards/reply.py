@@ -60,8 +60,9 @@ def fix_menu():
 def setting_menu():
     builder = ReplyKeyboardBuilder()
 
-    builder.row(KeyboardButton(text='🛎️ Уведомления',))
-    builder.row(KeyboardButton(text='⚙️ Изменить вид'))
+    builder.add(KeyboardButton(text='🛎️ Уведомления'))
+    builder.add(KeyboardButton(text='⚙️ вид'))
+    builder.row(KeyboardButton(text='🔄 Обновить данные'))
     builder.row(KeyboardButton(text=back_button_text))
 
     keyboard = builder.as_markup()
@@ -79,28 +80,3 @@ def alarm_setting_menu():
     keyboard = builder.as_markup()
     keyboard.resize_keyboard = True
     return keyboard
-
-
-async def alarm_menu(user_id: int):
-    async with session_maker() as session:
-        session: AsyncSession
-        result = await session.execute(select(Student).where(Student.user_id == user_id))
-        alarm_menu_buttons = [
-            alarm_on,
-            alarm_settings,
-            go_to_settings
-        ]
-
-        if result.scalars().one_or_none().alarm_state:
-            alarm_menu_buttons = [
-                alarm_off,
-                alarm_settings,
-                go_to_settings
-            ]
-        builder = ReplyKeyboardBuilder()
-        for menu_item in alarm_menu_buttons:
-            builder.row(KeyboardButton(text=menu_item))
-        keyboard = builder.as_markup()
-        keyboard.resize_keyboard = True
-
-        return keyboard
