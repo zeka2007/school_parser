@@ -33,7 +33,7 @@ def quarter_marks_analytics(lessons: list,
     average_mark = 0
     count = 0
     for mark in marks:
-        if mark != 'з.' and mark != 'Нет':
+        if mark.isdigit():
             average_mark = average_mark + int(mark)
             count = count + 1
     if count != 0:
@@ -43,7 +43,7 @@ def quarter_marks_analytics(lessons: list,
     if old_marks is not None:
         count = 0
         for mark in old_marks:
-            if mark != 'з.' and mark != 'Нет':
+            if mark.isdigit():
                 average_mark_old = average_mark_old + int(mark)
                 count = count + 1
         if count != 0:
