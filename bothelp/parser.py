@@ -372,7 +372,10 @@ class WebUser:
 
                     soup = BeautifulSoup(await req.content.read(), features="html.parser")
                     req.close()
-                    days = soup.find_all('div', {'class': 'db_day'})
+
+                    table = soup.find_all('div', {'class': 'db_days clearfix'})[1]
+
+                    days = table.find_all('div', {'class': 'db_day'})
                     for day in days:
                         lessons = day.find('tbody').find_all('tr')
                         for lesson in lessons:
@@ -384,11 +387,9 @@ class WebUser:
                                 if ln == lesson_name:
                                     mark = lesson.find('div', {'class': 'mark_box'}).text
                                     mark = mark.replace('\n', '')
-                                    # print(f'[{mark}]')
                                     if mark != '':
                                         if mark.find('/') != -1:
                                             marks.append(int(mark.split('/')[0]))
-                                            # print(mark.split('/')[0])
                                             marks.append(int(mark.split('/')[1]))
                                         else:
                                             marks.append(int(mark))
